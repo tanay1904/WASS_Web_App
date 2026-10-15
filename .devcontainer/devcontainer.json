@@ -21,7 +21,7 @@
   "portsAttributes": {
     "8080": {
       "label": "WASS 3D Wave Studio",
-      "onAutoForward": "openPreview",
+      "onAutoForward": "openBrowser",
       "protocol": "http",
       "elevateIfNeeded": false
     }

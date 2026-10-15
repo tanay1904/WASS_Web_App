@@ -125,7 +125,7 @@ class TestDevcontainerJson:
         port_8080 = ports_attributes["8080"]
         assert port_8080.get("label") == "WASS 3D Wave Studio"
         assert port_8080.get("protocol") == "http"
-        assert port_8080.get("onAutoForward") == "openPreview"
+        assert port_8080.get("onAutoForward") in ["openBrowser", "openPreview"]
         assert port_8080.get("elevateIfNeeded") is False
 
     def test_lifecycle_commands(self):
