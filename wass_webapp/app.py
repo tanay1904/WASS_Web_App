@@ -471,19 +471,20 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
         urls = {}
         try:
             s_req = requests.Session()
-            s_req.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+            s_req.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
             share_link = "https://1drv.ms/f/c/5b0c2115f65927cd/IgASJfo0JRCuTa1Ft6kYRcPLAXMnwQneMbuwA9Gm-Fzsjuw?e=fdSXuB"
-            resp_share = s_req.get(share_link, allow_redirects=True, timeout=15)
-            resp_share.raise_for_status()
+            resp_share = s_req.get(share_link, allow_redirects=True, timeout=30)
             share_token = "u!aHR0cHM6Ly8xZHJ2Lm1zL2YvYy81YjBjMjExNWY2NTkyN2NkL0lnQVNKZm8wSlJDdVRhMUZ0NmtZUmNQTEFYTW53UW5lTWJ1d0E5R20tRnpzanV3P2U9ZmRTWHVC"
             api_url = f"https://onedrive.live.com/personal/5b0c2115f65927cd/_api/v2.0/shares/{share_token}/driveItem/children"
-            resp_api = s_req.get(api_url, timeout=5)
-            resp_api.raise_for_status()
-            res_json = resp_api.json()
-            items = res_json.get("value", [])
-            urls = {it["name"]: it.get("@content.downloadUrl") for it in items if "name" in it}
-            if urls:
-                log(f"[OneDrive] Handshake complete. Stream URLs retrieved for {len(urls)} videos.")
+            resp_api = s_req.get(api_url, timeout=30)
+            if resp_api.status_code == 200:
+                res_json = resp_api.json()
+                items = res_json.get("value", [])
+                urls = {it["name"]: it.get("@content.downloadUrl") for it in items if "name" in it and it.get("@content.downloadUrl")}
+                if urls:
+                    log(f"[OneDrive] Handshake complete. Direct 4K stream URLs retrieved for {len(urls)} videos ({', '.join(sorted(urls.keys()))}).")
+            else:
+                log(f"[OneDrive Note] API responded with status {resp_api.status_code}")
         except Exception as e:
             log(f"[OneDrive Note] Cloud session status: {e}")
 
