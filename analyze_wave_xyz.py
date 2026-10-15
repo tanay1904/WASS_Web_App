@@ -221,11 +221,26 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path):
 
 
 if __name__ == "__main__":
-    test_xyz = r"C:\Users\tanay\.gemini\antigravity\scratch\wass_video_workspace\output\000000_wd\plane_refinement_inliers.xyz"
-    test_plane = r"C:\Users\tanay\.gemini\antigravity\scratch\wass_video_workspace\output\000000_wd\plane.txt"
-    if os.path.exists(test_xyz):
-        res, pts, dist, h_sea = analyze_xyz(test_xyz, test_plane)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="WASS 3D Ocean Wave Point Cloud & 5m Radar Arc Analyzer")
+    parser.add_argument("xyz_path", nargs="?", default=None, help="Path to input .xyz point cloud file")
+    parser.add_argument("--plane", type=str, default=None, help="Path to mean sea plane.txt (optional)")
+    parser.add_argument("--export-csv", type=str, default=None, help="Path to export annotated CSV with distance and MSL height")
+    args = parser.parse_args()
+
+    if args.xyz_path and os.path.exists(args.xyz_path):
+        res, pts, dist, h_sea = analyze_xyz(args.xyz_path, args.plane)
         print("Analysis completed successfully:")
         print(json.dumps(res, indent=2))
-        out_csv = r"C:\Users\tanay\.gemini\antigravity\scratch\annotated_wave_points_sample.csv"
-        export_annotated_xyz(pts[:1000], dist[:1000], h_sea[:1000], out_csv)
+        if args.export_csv:
+            export_annotated_xyz(pts, dist, h_sea, args.export_csv)
+    else:
+        # Default fallback check for benchmark dataset
+        default_xyz = os.path.join(os.path.dirname(__file__), "wass_webapp", "workspace", "sequence", "pointcloud_000.xyz")
+        if os.path.exists(default_xyz):
+            res, pts, dist, h_sea = analyze_xyz(default_xyz)
+            print("Analyzed default benchmark frame (pointcloud_000.xyz):")
+            print(json.dumps(res, indent=2))
+        else:
+            parser.print_help()
