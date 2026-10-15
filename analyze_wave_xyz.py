@@ -3,6 +3,69 @@ import sys
 import json
 import numpy as np
 
+
+def _empty_analysis_fallback(total_points=0):
+    """Returns a schema-compliant fallback dictionary for degenerate or empty point clouds."""
+    arc_centers = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
+    circular_arcs = [
+        {
+            "radius_m": r_c,
+            "band_m": f"{r_c - 2.5:.1f} - {r_c + 2.5:.1f}m",
+            "point_count": 0,
+            "significant_height_Hs_m": 0.0,
+            "Hs_m": 0.0,
+            "crest_m": 0.0,
+            "trough_m": 0.0,
+            "amplitude_m": 0.0,
+            "mean_elevation_m": 0.0,
+            "std_elevation_m": 0.0,
+            "azimuth_min_deg": 0.0,
+            "azimuth_max_deg": 0.0
+        }
+        for r_c in arc_centers
+    ]
+    return {
+        "total_points": int(total_points),
+        "observer_height_m": 4.76,
+        "significant_wave_height_Hs_m": 0.0,
+        "peak_crest_m": 0.0,
+        "deepest_trough_m": 0.0,
+        "wave_parameters": {
+            "mean_elevation_m": 0.0,
+            "elevation_std_sigma_m": 0.0,
+            "significant_wave_height_Hs_m": 0.0,
+            "crest_elevation_max_m": 0.0,
+            "trough_depth_min_m": 0.0,
+            "wave_amplitude_total_m": 0.0,
+            "skewness": 0.0,
+            "kurtosis": 3.0
+        },
+        "distance": {
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "mean_m": 0.0,
+            "median_m": 0.0
+        },
+        "distance_profile": [],
+        "circular_arcs_5m": circular_arcs,
+        "elevation_histogram": {
+            "bin_centers": [0.0] * 30,
+            "densities": [0.0] * 30
+        },
+        "elevation_distribution": {
+            "counts": [0] * 30,
+            "bin_edges_m": [0.0] * 31,
+            "bin_centers_m": [0.0] * 30
+        },
+        "plane_coefficients": {
+            "a": 0.0,
+            "b": 0.0,
+            "c": 1.0,
+            "d": 0.0
+        }
+    }
+
+
 def analyze_xyz(xyz_path, plane_path=None):
     """
     Analyzes 3D sea wave point cloud from an .xyz file.
@@ -11,22 +74,28 @@ def analyze_xyz(xyz_path, plane_path=None):
       - Height from mean sea level (elevation relative to sea plane)
       - Oceanographic wave statistics (Hs, Hmax, Hmin, skewness, kurtosis)
       - Binned distance vs. wave elevation profiles
+      - 10 concentric 5m radar arcs centered at vessel
     """
     if not os.path.exists(xyz_path):
         raise FileNotFoundError(f"XYZ file not found: {xyz_path}")
 
     pts = []
-    with open(xyz_path, "r") as f:
+    with open(xyz_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
             parts = line.strip().split()
             if len(parts) >= 3:
                 try:
-                    pts.append([float(parts[0]), float(parts[1]), float(parts[2])])
-                except ValueError:
+                    p0 = float(parts[0])
+                    p1 = float(parts[1])
+                    p2 = float(parts[2])
+                    if np.isfinite(p0) and np.isfinite(p1) and np.isfinite(p2):
+                        pts.append([p0, p1, p2])
+                except (ValueError, OverflowError):
                     continue
-    pts = np.array(pts)
-    if len(pts) == 0:
-        raise ValueError("No valid 3D points in XYZ file")
+
+    pts = np.array(pts, dtype=np.float64)
+    if len(pts) < 3:
+        return _empty_analysis_fallback(len(pts)), pts, np.array([], dtype=np.float64), np.array([], dtype=np.float64)
 
     # Determine whether points are already in oriented sea coordinates (Z = wave elevation)
     # or in raw camera frame (where Y is down, Z is optical depth away from camera).
@@ -43,38 +112,57 @@ def analyze_xyz(xyz_path, plane_path=None):
         d = 0.0
         if plane_path and os.path.exists(plane_path):
             try:
-                plane = np.loadtxt(plane_path)
-                observer_height = round(float(abs(plane[3])), 2)
+                plane = np.loadtxt(plane_path).flatten()
+                if len(plane) >= 4 and np.isfinite(plane[3]):
+                    observer_height = round(float(abs(plane[3])), 2)
+                else:
+                    observer_height = 4.76
             except Exception:
                 observer_height = 4.76
         else:
             observer_height = 4.76
     else:
         # Raw camera coordinates: fit or load mean sea plane in camera frame
+        plane_loaded = False
         if plane_path and os.path.exists(plane_path):
-            plane = np.loadtxt(plane_path)
-            a, b, c, d = plane[:4]
-        else:
-            # Robust SVD/RANSAC plane estimation
+            try:
+                plane = np.loadtxt(plane_path).flatten()
+                if len(plane) >= 4 and np.all(np.isfinite(plane[:4])):
+                    a, b, c, d = float(plane[0]), float(plane[1]), float(plane[2]), float(plane[3])
+                    plane_loaded = True
+            except Exception:
+                plane_loaded = False
+
+        if not plane_loaded:
             centroid = np.median(pts, axis=0)
-            u, s, vh = np.linalg.svd(pts - centroid)
-            normal = vh[2] # Smallest singular value eigenvector
-            a, b, c = normal
-            d = -np.dot(normal, centroid)
+            cov = np.cov(pts - centroid, rowvar=False)
+            if cov.shape == (3, 3) and np.all(np.isfinite(cov)):
+                try:
+                    u, s, vh = np.linalg.svd(cov)
+                    normal = vh[2]  # Smallest singular value eigenvector
+                except Exception:
+                    normal = np.array([0.0, 0.0, 1.0])
+            else:
+                normal = np.array([0.0, 0.0, 1.0])
+            a, b, c = float(normal[0]), float(normal[1]), float(normal[2])
+            d = -float(np.dot(normal, centroid))
 
         # Normalize plane equation: ||n|| = 1
         n = np.array([a, b, c], dtype=np.float64)
-        norm_n = np.linalg.norm(n)
-        n /= norm_n
-        d /= norm_n
+        norm_n = float(np.linalg.norm(n))
+        if norm_n > 1e-7 and np.isfinite(norm_n):
+            n /= norm_n
+            d /= norm_n
+        else:
+            n = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+            d = -4.76
 
         # Ensure plane normal points towards camera/observer (origin [0,0,0])
-        # The observer is at distance -d > 0 above sea level
         if d > 0:
             n = -n
             d = -d
 
-        observer_height = round(abs(d), 2)
+        observer_height = round(float(abs(d)), 2)
         height_sea_level = pts @ n + d
 
     # 1. Distance from observer for each point
@@ -82,12 +170,17 @@ def analyze_xyz(xyz_path, plane_path=None):
 
     # 3. Wave statistics
     sigma_eta = float(np.std(height_sea_level))
-    Hs = 4.0 * sigma_eta # Significant wave height (standard oceanographic definition)
+    Hs = 4.0 * sigma_eta  # Significant wave height (standard oceanographic definition)
     h_min = float(np.min(height_sea_level))
     h_max = float(np.max(height_sea_level))
     h_mean = float(np.mean(height_sea_level))
-    skewness = float(np.mean(((height_sea_level - h_mean) / (sigma_eta + 1e-9))**3))
-    kurtosis = float(np.mean(((height_sea_level - h_mean) / (sigma_eta + 1e-9))**4))
+
+    if sigma_eta > 1e-6:
+        skewness = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**3))
+        kurtosis = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**4))
+    else:
+        skewness = 0.0
+        kurtosis = 3.0
 
     # 4. Distance distribution
     dist_min = float(np.min(dist_observer))
@@ -95,23 +188,32 @@ def analyze_xyz(xyz_path, plane_path=None):
     dist_mean = float(np.mean(dist_observer))
     dist_median = float(np.median(dist_observer))
 
-    # 5. Distance bins and elevation profile
-    bin_edges = np.linspace(dist_min, min(dist_max, 50.0), 10)
+    # 5. Distance bins and elevation profile (strictly guarded against inverted boundaries)
+    if dist_min >= 50.0:
+        max_bound = dist_max if dist_max > dist_min else dist_min + 10.0
+    else:
+        max_bound = min(dist_max, 50.0) if dist_max > dist_min else dist_min + 1.0
+
+    if max_bound <= dist_min:
+        max_bound = dist_min + 10.0
+    bin_edges = np.linspace(dist_min, max_bound, 10)
     distance_profile = []
     for i in range(len(bin_edges) - 1):
         r_start, r_end = bin_edges[i], bin_edges[i+1]
         mask = (dist_observer >= r_start) & (dist_observer < r_end)
-        if np.sum(mask) > 10:
+        if np.sum(mask) >= 3:
             sub_h = height_sea_level[mask]
             sub_hs = round(float(4.0 * np.std(sub_h)), 3)
             distance_profile.append({
                 "range_m": f"{r_start:.1f} - {r_end:.1f}m",
+                "range_start_m": round(float(r_start), 2),
+                "range_end_m": round(float(r_end), 2),
                 "center_dist_m": round(float((r_start + r_end) / 2.0), 2),
                 "point_count": int(np.sum(mask)),
                 "mean_elevation_m": round(float(np.mean(sub_h)), 3),
-                "std_elevation_m": round(float(np.std(sub_h)), 3),
                 "crest_m": round(float(np.max(sub_h)), 3),
                 "trough_m": round(float(np.min(sub_h)), 3),
+                "amplitude_m": round(float(np.max(sub_h) - np.min(sub_h)), 3),
                 "significant_height_m": sub_hs,
                 "Hs_m": sub_hs
             })
@@ -119,14 +221,16 @@ def analyze_xyz(xyz_path, plane_path=None):
     # 5b. Fixed 5m Circular Arcs around the vessel (R = sqrt(X^2 + Y^2))
     # Concentric rings centered at vessel: 5m, 10m, 15m, 20m, 25m, 30m, 35m, 40m, 45m, 50m
     r_horiz = np.sqrt(pts[:, 0]**2 + pts[:, 1]**2)
-    azimuth_deg = np.degrees(np.arctan2(pts[:, 0], pts[:, 1]))  # 0 deg = forward
+    # Azimuth: 0 deg = forward (positive Y)
+    azimuth_deg = np.degrees(np.arctan2(pts[:, 0], np.maximum(pts[:, 1], 1e-6)))
 
     arc_centers = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
     circular_arcs = []
     for r_c in arc_centers:
         r_start = r_c - 2.5
         r_end = r_c + 2.5
-        mask = (r_horiz >= r_start) & (r_horiz < r_end)
+        # Confine to forward field of view (Y >= 0)
+        mask = (r_horiz >= r_start) & (r_horiz < r_end) & (pts[:, 1] >= 0.0)
         count = int(np.sum(mask))
         if count >= 3:
             sub_h = height_sea_level[mask]
@@ -164,9 +268,17 @@ def analyze_xyz(xyz_path, plane_path=None):
             "azimuth_max_deg": az_max
         })
 
-    # 6. Elevation histogram & distribution
-    counts_raw, bin_edges_raw = np.histogram(height_sea_level, bins=30)
-    hist_counts, hist_bins = np.histogram(height_sea_level, bins=30, density=True)
+    # 6. Elevation histogram & distribution (safe against uniform values)
+    if len(height_sea_level) >= 2 and (np.max(height_sea_level) > np.min(height_sea_level)):
+        counts_raw, bin_edges_raw = np.histogram(height_sea_level, bins=30)
+        hist_counts, hist_bins = np.histogram(height_sea_level, bins=30, density=True)
+    else:
+        val = float(height_sea_level[0]) if len(height_sea_level) > 0 else 0.0
+        counts_raw = np.array([len(height_sea_level)] + [0]*29)
+        bin_edges_raw = np.linspace(val - 1.0, val + 1.0, 31)
+        hist_counts = np.array([1.0] + [0.0]*29)
+        hist_bins = bin_edges_raw
+
     hist_data = {
         "bin_centers": [round(float((hist_bins[i] + hist_bins[i+1])/2.0), 3) for i in range(len(hist_counts))],
         "densities": [round(float(c), 4) for c in hist_counts]
@@ -179,29 +291,35 @@ def analyze_xyz(xyz_path, plane_path=None):
 
     result = {
         "total_points": int(len(pts)),
-        "observer_height_m": round(float(observer_height), 2),
-        "significant_wave_height_Hs_m": round(float(Hs), 3),
-        "peak_crest_m": round(float(h_max), 3),
-        "deepest_trough_m": round(float(h_min), 3),
-        "mean_elevation_m": round(float(h_mean), 4),
-        "elevation_std_sigma_m": round(float(sigma_eta), 3),
-        "elevation_skewness": round(float(skewness), 3),
-        "elevation_kurtosis": round(float(kurtosis), 3),
+        "observer_height_m": round(float(np.nan_to_num(observer_height, nan=4.76)), 2),
+        "significant_wave_height_Hs_m": round(float(np.nan_to_num(Hs, nan=0.0)), 3),
+        "peak_crest_m": round(float(np.nan_to_num(h_max, nan=0.0)), 3),
+        "deepest_trough_m": round(float(np.nan_to_num(h_min, nan=0.0)), 3),
+        "wave_parameters": {
+            "mean_elevation_m": round(float(np.nan_to_num(h_mean, nan=0.0)), 3),
+            "elevation_std_sigma_m": round(float(np.nan_to_num(sigma_eta, nan=0.0)), 3),
+            "significant_wave_height_Hs_m": round(float(np.nan_to_num(Hs, nan=0.0)), 3),
+            "crest_elevation_max_m": round(float(np.nan_to_num(h_max, nan=0.0)), 3),
+            "trough_depth_min_m": round(float(np.nan_to_num(h_min, nan=0.0)), 3),
+            "wave_amplitude_total_m": round(float(np.nan_to_num(h_max - h_min, nan=0.0)), 3),
+            "skewness": round(float(np.nan_to_num(skewness, nan=0.0)), 3),
+            "kurtosis": round(float(np.nan_to_num(kurtosis, nan=3.0)), 3)
+        },
         "distance": {
-            "min_m": round(float(dist_min), 2),
-            "max_m": round(float(dist_max), 2),
-            "mean_m": round(float(dist_mean), 2),
-            "median_m": round(float(dist_median), 2)
+            "min_m": round(float(np.nan_to_num(dist_min, nan=0.0)), 2),
+            "max_m": round(float(np.nan_to_num(dist_max, nan=0.0)), 2),
+            "mean_m": round(float(np.nan_to_num(dist_mean, nan=0.0)), 2),
+            "median_m": round(float(np.nan_to_num(dist_median, nan=0.0)), 2)
         },
         "distance_profile": distance_profile,
         "circular_arcs_5m": circular_arcs,
         "elevation_histogram": hist_data,
         "elevation_distribution": dist_data,
         "plane_coefficients": {
-            "a": round(float(n[0]), 5),
-            "b": round(float(n[1]), 5),
-            "c": round(float(n[2]), 5),
-            "d": round(float(d), 5)
+            "a": round(float(np.nan_to_num(n[0], nan=0.0)), 5),
+            "b": round(float(np.nan_to_num(n[1], nan=0.0)), 5),
+            "c": round(float(np.nan_to_num(n[2], nan=1.0)), 5),
+            "d": round(float(np.nan_to_num(d, nan=0.0)), 5)
         }
     }
     return result, pts, dist_observer, height_sea_level
@@ -213,10 +331,12 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path):
     Columns: X, Y, Z, distance_from_observer_m, height_from_sea_level_m
     """
     header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m\n"
-    with open(out_csv_path, "w") as f:
+    with open(out_csv_path, "w", encoding="utf-8") as f:
         f.write(header)
         for i in range(len(pts)):
-            f.write(f"{pts[i,0]:.4f},{pts[i,1]:.4f},{pts[i,2]:.4f},{dist_observer[i]:.4f},{height_sea_level[i]:.4f}\n")
+            d_val = dist_observer[i] if i < len(dist_observer) else 0.0
+            h_val = height_sea_level[i] if i < len(height_sea_level) else 0.0
+            f.write(f"{pts[i,0]:.4f},{pts[i,1]:.4f},{pts[i,2]:.4f},{d_val:.4f},{h_val:.4f}\n")
     print(f"Exported annotated dataset to {out_csv_path}")
 
 

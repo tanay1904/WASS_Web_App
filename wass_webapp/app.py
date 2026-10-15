@@ -5,6 +5,9 @@ import glob
 import shutil
 import threading
 import subprocess
+import re
+from pathlib import Path
+from contextlib import asynccontextmanager
 import cv2
 import numpy as np
 import asyncio
@@ -15,7 +18,59 @@ from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-app = FastAPI(title="WASS 3D Sea Wave Reconstruction Web Studio")
+SAFE_NAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-]+$')
+
+
+def is_safe_identifier(val: str) -> bool:
+    """Validate that identifier contains only alphanumeric, underscores, and hyphens."""
+    return bool(SAFE_NAME_REGEX.match(val)) if val else False
+
+
+def sanitize_filename(filename: str) -> str:
+    """Sanitize uploaded filenames preventing directory traversal."""
+    if not filename:
+        return "unnamed_upload.bin"
+    base = Path(filename).name
+    safe = re.sub(r'[^a-zA-Z0-9_.-]', '_', base)
+    return safe if safe and safe not in [".", ".."] else "unnamed_upload.bin"
+
+
+pipeline_lock = threading.Lock()
+
+_cached_all_points = None
+_cached_all_points_bytes = None
+_cached_all_analysis = None
+_cached_all_analysis_bytes = None
+_cached_frames_bytes = {}
+
+
+def invalidate_caches():
+    """Atomically invalidate and purge all cached point clouds, analyses, and frames."""
+    global _cached_all_points, _cached_all_points_bytes
+    global _cached_all_analysis, _cached_all_analysis_bytes
+    global _cached_frames_bytes
+    _cached_all_points = None
+    _cached_all_points_bytes = None
+    _cached_all_analysis = None
+    _cached_all_analysis_bytes = None
+    _cached_frames_bytes.clear()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler replacing deprecated @app.on_event handlers."""
+    try:
+        get_all_points()
+        get_all_analysis()
+        tf = _get_active_total_frames()
+        for i in range(tf):
+            get_sequence_frame(i)
+    except Exception as e:
+        print(f"[Cache Warmup Note] {e}")
+    yield
+
+
+app = FastAPI(title="WASS 3D Sea Wave Reconstruction Web Studio", lifespan=lifespan)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PREDICT_DIR = os.path.dirname(BASE_DIR)
@@ -199,10 +254,12 @@ SAVE_FULL_MESH=true
 
 
 def run_stereo_stream_worker(pair_name, max_frames, step, reconstruct_mode="wass_cpp"):
-    pipeline_state["status"] = "running"
-    pipeline_state["progress"] = 5
-    pipeline_state["logs"] = []
-    pipeline_state["reconstructed_frames"] = []
+    with pipeline_lock:
+        pipeline_state["status"] = "running"
+        pipeline_state["progress"] = 5
+        pipeline_state["logs"] = []
+        pipeline_state["reconstructed_frames"] = []
+        invalidate_caches()
 
     try:
         binaries = get_wass_binaries()
@@ -446,27 +503,29 @@ def run_stereo_stream_worker(pair_name, max_frames, step, reconstruct_mode="wass
         with open(os.path.join(seq_dir, "sequence_meta.json"), "w") as fm:
             json.dump(meta, fm, indent=2)
 
-        global _cached_all_points, _cached_all_analysis
-        _cached_all_points = None
-        _cached_all_analysis = None
+        invalidate_caches()
 
-        pipeline_state["progress"] = 100
-        pipeline_state["current_stage"] = "Completed"
-        pipeline_state["status"] = "completed"
-        pipeline_state["reconstructed_frames"] = [f"frame_{i:03d}" for i in range(rendered_count)]
+        with pipeline_lock:
+            pipeline_state["progress"] = 100
+            pipeline_state["current_stage"] = "Completed"
+            pipeline_state["status"] = "completed"
+            pipeline_state["reconstructed_frames"] = [f"frame_{i:03d}" for i in range(rendered_count)]
         log(f"\n[Success] All {rendered_count} frames successfully reconstructed into 3D meshes and oceanographic wave telemetry!")
 
     except Exception as e:
-        pipeline_state["status"] = "error"
-        pipeline_state["current_stage"] = "Error"
+        with pipeline_lock:
+            pipeline_state["status"] = "error"
+            pipeline_state["current_stage"] = "Error"
         log(f"\n[Error] Pipeline failed: {str(e)}")
 
 
 def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=None):
-    pipeline_state["status"] = "running"
-    pipeline_state["progress"] = 5
-    pipeline_state["logs"] = []
-    pipeline_state["reconstructed_frames"] = []
+    with pipeline_lock:
+        pipeline_state["status"] = "running"
+        pipeline_state["progress"] = 5
+        pipeline_state["logs"] = []
+        pipeline_state["reconstructed_frames"] = []
+        invalidate_caches()
 
     try:
         binaries = get_wass_binaries()
@@ -582,15 +641,18 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=
             log(f"  Frame {i:02d}: 3D Mesh & Disparity Generated.")
             pipeline_state["progress"] = 75 + int((i + 1) / len(workspaces) * 25)
 
-        pipeline_state["status"] = "completed"
-        pipeline_state["progress"] = 100
-        pipeline_state["current_stage"] = "Completed"
-        pipeline_state["reconstructed_frames"] = [os.path.basename(w) for w in workspaces]
+        invalidate_caches()
+        with pipeline_lock:
+            pipeline_state["status"] = "completed"
+            pipeline_state["progress"] = 100
+            pipeline_state["current_stage"] = "Completed"
+            pipeline_state["reconstructed_frames"] = [os.path.basename(w) for w in workspaces]
         log("\n[Success] All 3D Sea Wave Reconstruction Stages Completed Successfully!")
 
     except Exception as e:
-        pipeline_state["status"] = "error"
-        pipeline_state["current_stage"] = "Error"
+        with pipeline_lock:
+            pipeline_state["status"] = "error"
+            pipeline_state["current_stage"] = "Error"
         log(f"\n[Error] Pipeline failed: {str(e)}")
 
 
@@ -628,8 +690,24 @@ async def start_pipeline(
     max_frames: int = Form(5),
     step: int = Form(1)
 ):
-    if pipeline_state["status"] == "running":
-        return JSONResponse({"error": "Pipeline is already running"}, status_code=400)
+    if video_source not in ["pair1", "pair2", "sample", "dual", "sbs"]:
+        return JSONResponse({"error": f"Invalid video_source '{video_source}'"}, status_code=400)
+
+    if max_frames < 1 or max_frames > 500:
+        return JSONResponse({"error": "max_frames must be between 1 and 500"}, status_code=400)
+
+    if step < 1 or step > 100:
+        return JSONResponse({"error": "step must be between 1 and 100"}, status_code=400)
+
+    with pipeline_lock:
+        if pipeline_state["status"] == "running":
+            return JSONResponse({"error": "Pipeline is already running"}, status_code=400)
+        pipeline_state["status"] = "running"
+        pipeline_state["progress"] = 0
+        pipeline_state["current_stage"] = "Initializing"
+        pipeline_state["logs"] = [f"[Pipeline] Initialized pipeline with source={video_source}"]
+        pipeline_state["reconstructed_frames"] = []
+        invalidate_caches()
 
     if video_source in ["pair1", "pair2"]:
         background_tasks.add_task(
@@ -647,18 +725,51 @@ async def start_pipeline(
         use_sample = "synthetic"
     elif video_source == "dual":
         if not cam0_file or not cam1_file:
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
             return JSONResponse({"error": "Please upload both Cam0 and Cam1 video files"}, status_code=400)
-        v0_path = os.path.join(UPLOAD_DIR, "cam0_" + cam0_file.filename)
-        v1_path = os.path.join(UPLOAD_DIR, "cam1_" + cam1_file.filename)
-        with open(v0_path, "wb") as f0, open(v1_path, "wb") as f1:
-            f0.write(await cam0_file.read())
-            f1.write(await cam1_file.read())
+
+        safe_c0 = sanitize_filename(cam0_file.filename)
+        safe_c1 = sanitize_filename(cam1_file.filename)
+        v0_path = os.path.join(UPLOAD_DIR, "cam0_" + safe_c0)
+        v1_path = os.path.join(UPLOAD_DIR, "cam1_" + safe_c1)
+
+        upload_real = os.path.realpath(UPLOAD_DIR)
+        if not os.path.realpath(v0_path).startswith(upload_real) or not os.path.realpath(v1_path).startswith(upload_real):
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": "Invalid file upload path"}, status_code=400)
+
+        try:
+            with open(v0_path, "wb") as f0, open(v1_path, "wb") as f1:
+                f0.write(await cam0_file.read())
+                f1.write(await cam1_file.read())
+        except Exception as e:
+            with pipeline_lock:
+                pipeline_state["status"] = "error"
+            return JSONResponse({"error": f"Failed to save uploaded files: {str(e)}"}, status_code=500)
+
     elif video_source == "sbs":
         if not sbs_file:
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
             return JSONResponse({"error": "Please upload a side-by-side stereo video"}, status_code=400)
-        sbs_path = os.path.join(UPLOAD_DIR, "sbs_" + sbs_file.filename)
-        with open(sbs_path, "wb") as fs:
-            fs.write(await sbs_file.read())
+
+        safe_sbs = sanitize_filename(sbs_file.filename)
+        sbs_path = os.path.join(UPLOAD_DIR, "sbs_" + safe_sbs)
+        upload_real = os.path.realpath(UPLOAD_DIR)
+        if not os.path.realpath(sbs_path).startswith(upload_real):
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": "Invalid file upload path"}, status_code=400)
+
+        try:
+            with open(sbs_path, "wb") as fs:
+                fs.write(await sbs_file.read())
+        except Exception as e:
+            with pipeline_lock:
+                pipeline_state["status"] = "error"
+            return JSONResponse({"error": f"Failed to save uploaded file: {str(e)}"}, status_code=500)
 
     background_tasks.add_task(
         run_pipeline_worker,
@@ -675,13 +786,22 @@ async def start_pipeline(
 
 @app.get("/api/pointcloud/{frame_name}")
 def get_pointcloud(frame_name: str, max_points: int = 15000):
-    json_path = os.path.join(WORK_DIR, "output", frame_name, "points.json")
+    if not is_safe_identifier(frame_name):
+        return JSONResponse({"error": "Invalid frame name identifier"}, status_code=400)
+    max_points = max(1, min(max_points, 100000))
+
+    target_dir = os.path.realpath(os.path.join(WORK_DIR, "output", frame_name))
+    work_real = os.path.realpath(WORK_DIR)
+    if not target_dir.startswith(work_real):
+        return JSONResponse({"error": "Access denied"}, status_code=403)
+
+    json_path = os.path.join(target_dir, "points.json")
     if os.path.exists(json_path):
         with open(json_path, "r") as f:
             pts = json.load(f)
         return JSONResponse({"count": len(pts), "points": pts})
     
-    xyz_path = os.path.join(WORK_DIR, "output", frame_name, "plane_refinement_inliers.xyz")
+    xyz_path = os.path.join(target_dir, "plane_refinement_inliers.xyz")
     if not os.path.exists(xyz_path):
         return JSONResponse({"error": "Pointcloud file not found"}, status_code=404)
 
@@ -704,12 +824,6 @@ def get_pointcloud(frame_name: str, max_points: int = 15000):
         "count": len(pts),
         "points": pts.tolist()
     })
-
-
-_cached_all_points = None
-_cached_all_points_bytes = None
-_cached_all_analysis = None
-_cached_all_analysis_bytes = None
 
 def _get_active_total_frames():
     seq_dir = os.path.join(WORK_DIR, "sequence")
@@ -758,20 +872,6 @@ def get_all_analysis():
     return Response(content=_cached_all_analysis_bytes, media_type="application/json")
 
 
-_cached_frames_bytes = {}
-
-@app.on_event("startup")
-def startup_cache_warmup():
-    try:
-        get_all_points()
-        get_all_analysis()
-        tf = _get_active_total_frames()
-        for i in range(tf):
-            get_sequence_frame(i)
-    except Exception as e:
-        print(f"[Cache Warmup Warning] {e}")
-
-
 @app.get("/api/sequence/meta")
 def get_sequence_meta():
     meta_path = os.path.join(WORK_DIR, "sequence", "sequence_meta.json")
@@ -815,6 +915,9 @@ def get_wave_analysis(target: str):
     Returns wave analysis data (height from sea level, distance from observer,
     significant wave height, distance profile, elevation histogram).
     """
+    if not is_safe_identifier(target):
+        return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+
     analysis_file = None
     total_frames = _get_active_total_frames()
     if target.startswith("frame_"):
@@ -837,8 +940,11 @@ def get_wave_analysis(target: str):
             return JSONResponse({"error": "Wave analysis not found for " + target}, status_code=404)
         analysis_file = os.path.join(WORK_DIR, "sequence", f"wave_analysis_{idx:03d}.json")
     else:
-        clean_target = os.path.basename(target)
-        analysis_file = os.path.join(WORK_DIR, "output", clean_target, "wave_analysis.json")
+        target_path = os.path.realpath(os.path.join(WORK_DIR, "output", target, "wave_analysis.json"))
+        work_real = os.path.realpath(WORK_DIR)
+        if not target_path.startswith(work_real):
+            return JSONResponse({"error": "Access denied"}, status_code=403)
+        analysis_file = target_path
     
     if analysis_file and os.path.exists(analysis_file):
         with open(analysis_file, "r") as fa:
@@ -853,6 +959,9 @@ def export_wave_analysis_csv(target: str):
     Downloads the annotated CSV containing:
     x_camera_m, y_camera_m, z_camera_m, distance_from_observer_m, height_from_sea_level_m
     """
+    if not is_safe_identifier(target):
+        return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+
     csv_file = None
     total_frames = _get_active_total_frames()
     if target.startswith("frame_"):
@@ -878,9 +987,12 @@ def export_wave_analysis_csv(target: str):
         csv_file = os.path.join(WORK_DIR, "sequence", f"annotated_points_{idx:03d}.csv")
         filename = f"wave_analysis_frame_{idx:03d}.csv"
     else:
-        clean_target = os.path.basename(target)
-        csv_file = os.path.join(WORK_DIR, "output", clean_target, "annotated_wave_points.csv")
-        filename = f"wave_analysis_{clean_target}.csv"
+        target_path = os.path.realpath(os.path.join(WORK_DIR, "output", target, "annotated_wave_points.csv"))
+        work_real = os.path.realpath(WORK_DIR)
+        if not target_path.startswith(work_real):
+            return JSONResponse({"error": "Access denied"}, status_code=403)
+        csv_file = target_path
+        filename = f"wave_analysis_{target}.csv"
 
     if csv_file and os.path.exists(csv_file):
         return FileResponse(
@@ -897,6 +1009,9 @@ def export_circular_arcs_csv(target: str):
     Downloads CSV containing the 5m circular arc wave output matching RFC 4180:
     arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg
     """
+    if not is_safe_identifier(target):
+        return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+
     idx = None
     if target.startswith("frame_"):
         val = target.replace("frame_", "")
@@ -966,5 +1081,7 @@ def export_circular_arcs_csv(target: str):
 
 
 if __name__ == "__main__":
-    print("Starting WASS Web Application on http://localhost:8080 ...")
-    uvicorn.run(app, host="127.0.0.1", port=8080, log_level="info")
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8080"))
+    print(f"Starting WASS Web Application on http://{host}:{port} ...")
+    uvicorn.run(app, host=host, port=port, log_level="info")

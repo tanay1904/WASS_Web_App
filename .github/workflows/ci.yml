@@ -6,17 +6,29 @@ on:
   pull_request:
     branches: [ main, master ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.11', '3.12']
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.10
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: ${{ matrix.python-version }}
         cache: 'pip'
 
     - name: Install dependencies
@@ -24,6 +36,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run Test Suite
+    - name: Syntax & bytecode compilation check
       run: |
-        pytest tests/ -v --durations=10
+        python -m py_compile analyze_wave_xyz.py wass_video_pipeline.py wass_webapp/app.py
+
+    - name: Run Pytest Test Suite
+      run: |
+        pytest -v --durations=10
