@@ -130,9 +130,9 @@ x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_
 To retrieve the entire reconstructed dataset across all 60 frames programmatically:
 * **All 3D Points:** `GET /api/sequence/all_points` returns a pre-serialized JSON mapping each frame index to its 7,000 vertices $[X, Y, Z]$.
 * **All Wave Telemetry:** `GET /api/sequence/all_analysis` returns the complete 60-frame time series of wave statistics and 10-bin arc telemetry.
-* **Command-Line Batch Extraction:** Run the standalone analysis script to regenerate all CSV logs:
+* **Command-Line Batch Extraction:** Retrieve arc telemetry directly via curl or Python API client:
   ```bash
-  python regenerate_5m_arcs.py
+  curl -O http://127.0.0.1:8080/api/wave_analysis/export_arcs/sequence_000
   ```
 
 #### 4. Python API Script: Downloading Single-Frame & Full-Sequence Data
@@ -162,16 +162,16 @@ print(f"Retrieved 3D surface vertices for {len(all_points)} frames.")
 ```
 
 #### 5. Standalone Point Cloud (.xyz) Analysis via Python
-Use `analyze_wave_xyz.py` to analyze custom 3D point clouds, compute 5m concentric radar arcs, and export annotated datasets:
+Use `wass_webapp/analyze_wave_xyz.py` to analyze custom 3D point clouds, compute 5m concentric radar arcs, and export annotated datasets:
 
 ```bash
 # Analyze benchmark point cloud and export annotated CSV with distance and MSL height
-python analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv annotated_points_000.csv
+python wass_webapp/analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv annotated_points_000.csv
 ```
 
 Programmatic usage inside custom Python scripts:
 ```python
-from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz
 
 # Ingest point cloud and compute wave statistics + 5m radar arcs
 stats, pts, distances, elevations = analyze_xyz("wass_webapp/workspace/sequence/pointcloud_000.xyz")
@@ -221,11 +221,11 @@ Tab 2 provides the batch processing engine for ingesting raw stereo video footag
 
 ### Command-Line Python Pipeline Execution (CLI)
 
-You can run the full WASS stereophotogrammetric video processing pipeline directly from your terminal using `wass_video_pipeline.py` without opening the browser.
+You can run the full WASS stereophotogrammetric video processing pipeline directly from your terminal using `wass_webapp/wass_video_pipeline.py` without opening the browser.
 
 #### Option A: Ingest Calibrated Dual-Camera Video Streams (Cam 0 & Cam 1)
 ```bash
-python wass_video_pipeline.py \
+python wass_webapp/wass_video_pipeline.py \
     --video0 path/to/cam0_left.mp4 \
     --video1 path/to/cam1_right.mp4 \
     --max-frames 60 \
@@ -235,20 +235,14 @@ python wass_video_pipeline.py \
 
 #### Option B: Ingest Side-by-Side (SBS) Composite Stereo Video
 ```bash
-python wass_video_pipeline.py \
+python wass_webapp/wass_video_pipeline.py \
     --video-sbs path/to/stereo_sbs.mp4 \
     --max-frames 100 \
     --step 1 \
     --work-dir ./pipeline_output
 ```
 
-#### Option C: Batch Sequence 5m Radar Arcs & Telemetry Regeneration
-To recalculate all 60 frames of dense disparity, 3D regularized surfaces, and 10 concentric 5m radar arc tables from the existing calibrated footage:
-```bash
-python regenerate_5m_arcs.py
-```
-
-#### CLI Parameter Reference for `wass_video_pipeline.py`
+#### CLI Parameter Reference for `wass_webapp/wass_video_pipeline.py`
 | Argument | Type | Default | Description |
 | :--- | :---: | :---: | :--- |
 | `--video0` | `str` | `None` | Path to primary left camera video file (`Cam 0`) |
@@ -267,28 +261,37 @@ python regenerate_5m_arcs.py
 .
 ├── .devcontainer/
 │   └── devcontainer.json               # GitHub Codespaces container specification
+├── .devcontainer/
+│   └── devcontainer.json               # 1-Click GitHub Codespaces configuration
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                      # Automated CI verification suite
+│       └── ci.yml                      # Automated CI verification suite (Python 3.10, 3.11, 3.12)
 ├── docs/
 │   ├── DATA_SPECIFICATION.md           # Oceanographic coordinates & mathematical specification
-│   └── images/                         # Documentation visual walkthrough assets
+│   └── images/                         # Documentation visual walkthrough screenshots
 ├── tests/
 │   ├── test_wave_math.py               # Unit tests for physical stereo math & 5m arcs
-│   └── test_api_endpoints.py           # Integration tests for FastAPI endpoints & RFC 4180 CSV
+│   ├── test_api_endpoints.py           # Integration tests for FastAPI endpoints & RFC 4180 CSV
+│   ├── test_adversarial_math.py        # Adversarial fuzzing for SVD, NaNs, Infs, & collinearity
+│   └── test_security_resilience.py     # Path traversal, upload sanitization, & concurrency tests
 ├── wass_webapp/
 │   ├── app.py                          # High-performance FastAPI backend application
+│   ├── analyze_wave_xyz.py             # Core oceanographic wave field analyzer & 5m radar arcs
+│   ├── wass_video_pipeline.py          # Stereo ingestion & calibration pipeline
 │   ├── static/
 │   │   ├── vendor/                     # 100% offline Three.js, OrbitControls, Bootstrap
 │   │   └── webfonts/                   # Vendored FontAwesome webfonts
 │   ├── templates/
 │   │   └── index.html                  # Responsive 3D WebGL cockpit
 │   └── workspace/
+│       ├── config/                     # WASS camera calibrations & worksession configurations
 │       └── sequence/                   # Benchmark 60-frame calibrated stereo dataset
-├── analyze_wave_xyz.py                 # Core oceanographic wave field analyzer & circular arcs
-├── wass_video_pipeline.py              # Stereo ingestion & calibration pipeline
-├── regenerate_5m_arcs.py               # Batch sequence telemetry regeneration tool
-└── requirements.txt                    # Project Python dependencies
+├── .gitattributes                      # Git LFS & line ending normalization
+├── .gitignore                          # Strict file exclusion rules
+├── LICENSE                             # MIT License
+├── pyproject.toml                      # Standard Python build configuration & pytest options
+├── README.md                           # Web Studio documentation & complete guide
+└── requirements.txt                    # Pinned runtime dependencies
 ```
 
 ---
@@ -452,12 +455,12 @@ python regenerate_5m_arcs.py
 
 * **Command-Line Interface:**
   ```bash
-  python analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv annotated_points_000.csv
+  python wass_webapp/analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv annotated_points_000.csv
   ```
 
 * **Python Programmatic Script:**
   ```python
-  from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+  from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz
 
   # Ingest 3D point cloud, fit sea plane, and compute 5m concentric radar arcs
   stats, pts, distances, elevations = analyze_xyz("wass_webapp/workspace/sequence/pointcloud_000.xyz")
@@ -470,7 +473,7 @@ python regenerate_5m_arcs.py
 
 ---
 
-### 5. Python API Client: Downloading Telemetry & Point Clouds
+### 4. Python API Client: Downloading Telemetry & Point Clouds
 
 Programmatic access to live Web Studio telemetry using standard Python packages:
 
@@ -496,17 +499,16 @@ print(f"Retrieved 3D mesh points for {len(all_points)} frames")
 
 ---
 
-### 6. Quick Reference Table
+### 5. Quick Reference Table
 
 | Task | Command | Description |
 | :--- | :--- | :--- |
 | **Start Web Studio** | `python wass_webapp/app.py` | Starts FastAPI web server on `http://127.0.0.1:8080` |
 | **Start with Uvicorn** | `python -m uvicorn wass_webapp.app:app --host 0.0.0.0 --port 8080` | Production Uvicorn launch |
 | **Start Dev Mode** | `python -m uvicorn wass_webapp.app:app --host 0.0.0.0 --port 8080 --reload` | Auto-reloads on file changes |
-| **Run Dual-Video Pipeline** | `python wass_video_pipeline.py --video0 left.mp4 --video1 right.mp4 --max-frames 60 --step 3` | Ingests stereo video pair |
-| **Run SBS Video Pipeline** | `python wass_video_pipeline.py --video-sbs sbs.mp4 --max-frames 100 --step 1` | Ingests Side-by-Side video |
-| **Batch Regenerate Arcs** | `python regenerate_5m_arcs.py` | Regenerates all 60 frames 5m arcs and CSVs |
-| **Analyze Point Cloud (.xyz)**| `python analyze_wave_xyz.py pointcloud.xyz --export-csv wave_pts.csv` | Analyzes 3D waves & exports CSV |
+| **Run Dual-Video Pipeline** | `python wass_webapp/wass_video_pipeline.py --video0 left.mp4 --video1 right.mp4 --max-frames 60 --step 3` | Ingests stereo video pair |
+| **Run SBS Video Pipeline** | `python wass_webapp/wass_video_pipeline.py --video-sbs sbs.mp4 --max-frames 100 --step 1` | Ingests Side-by-Side video |
+| **Analyze Point Cloud (.xyz)**| `python wass_webapp/analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv wave_pts.csv` | Analyzes 3D waves & exports CSV |
 | **Run Full Test Suite** | `python -m pytest tests/ -v` | Executes all 28 automated tests |
 | **Run Wave Math Tests** | `python -m pytest tests/test_wave_math.py -v` | Validates metric formulas & bow clearance |
 | **Run API Tests** | `python -m pytest tests/test_api_endpoints.py -v` | Validates endpoints & RFC 4180 CSV |

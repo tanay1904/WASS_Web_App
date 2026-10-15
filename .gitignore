@@ -48,7 +48,8 @@ level3_audit_results.json
 # Whitelist documentation images
 !docs/images/*
 
-level3_audit_results.json
+regenerate_5m_arcs.py
+*.bak
 
 # Webapp intermediate scratch and working directories (stay local)
 wass_webapp/workspace/wass_frames/

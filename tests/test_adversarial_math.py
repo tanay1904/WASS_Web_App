@@ -5,10 +5,16 @@ import numpy as np
 import pytest
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WEBAPP_DIR = os.path.join(ROOT_DIR, "wass_webapp")
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
+if WEBAPP_DIR not in sys.path:
+    sys.path.insert(0, WEBAPP_DIR)
 
-from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+try:
+    from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+except ImportError:
+    from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
 
 
 def test_empty_point_cloud(tmp_path):

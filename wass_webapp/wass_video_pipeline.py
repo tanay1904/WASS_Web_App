@@ -16,10 +16,12 @@ import numpy as np
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_LOCAL_DIST = os.path.join(BASE_DIR, "wass_dist", "wass_1.11_win32_x64", "dist", "bin")
+PREDICT_DIR = os.path.dirname(BASE_DIR)
+_LOCAL_DIST = os.path.join(PREDICT_DIR, "wass_dist", "wass_1.11_win32_x64", "dist", "bin")
+_WEBAPP_DIST = os.path.join(BASE_DIR, "wass_dist", "wass_1.11_win32_x64", "dist", "bin")
 _PREDICT_DIST = r"C:\Users\tanay\predicttion\wass_dist\wass_1.11_win32_x64\dist\bin"
 _SCRATCH_DIST = r"C:\Users\tanay\.gemini\antigravity\scratch\wass_dist\wass_1.11_win32_x64\dist\bin"
-WASS_BIN_DIR = _LOCAL_DIST if os.path.exists(_LOCAL_DIST) else (_PREDICT_DIST if os.path.exists(_PREDICT_DIST) else _SCRATCH_DIST)
+WASS_BIN_DIR = _LOCAL_DIST if os.path.exists(_LOCAL_DIST) else (_WEBAPP_DIST if os.path.exists(_WEBAPP_DIST) else (_PREDICT_DIST if os.path.exists(_PREDICT_DIST) else _SCRATCH_DIST))
 
 
 

@@ -38,7 +38,7 @@ jobs:
 
     - name: Syntax & bytecode compilation check
       run: |
-        python -m py_compile analyze_wave_xyz.py wass_video_pipeline.py wass_webapp/app.py
+        python -m py_compile wass_webapp/analyze_wave_xyz.py wass_webapp/wass_video_pipeline.py wass_webapp/app.py
 
     - name: Run Pytest Test Suite
       run: |

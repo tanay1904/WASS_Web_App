@@ -102,13 +102,16 @@ pipeline_state = {
 }
 
 # Import core helper functions from wass_video_pipeline and wave analyzer
-if WASS_DIR not in sys.path:
-    sys.path.append(WASS_DIR)
-SCRATCH_DIR = PREDICT_DIR
-if SCRATCH_DIR not in sys.path:
-    sys.path.append(SCRATCH_DIR)
-from wass_video_pipeline import get_wass_binaries, copy_or_create_configs, extract_frames_from_videos
-from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+if PREDICT_DIR not in sys.path:
+    sys.path.insert(0, PREDICT_DIR)
+try:
+    from wass_webapp.wass_video_pipeline import get_wass_binaries, copy_or_create_configs, extract_frames_from_videos
+    from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+except ImportError:
+    from wass_video_pipeline import get_wass_binaries, copy_or_create_configs, extract_frames_from_videos
+    from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
 
 
 def log(message):
