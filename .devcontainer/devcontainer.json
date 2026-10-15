@@ -1,8 +1,6 @@
 {
   "name": "WASS 3D Sea Wave Reconstruction Studio",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  "image": "mcr.microsoft.com/devcontainers/python:3.10",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {}
   },
