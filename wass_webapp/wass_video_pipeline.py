@@ -39,23 +39,40 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PREDICT_DIR = os.path.dirname(BASE_DIR)
 _LOCAL_DIST = os.path.join(PREDICT_DIR, "wass_dist", "wass_1.11_win32_x64", "dist", "bin")
 _WEBAPP_DIST = os.path.join(BASE_DIR, "wass_dist", "wass_1.11_win32_x64", "dist", "bin")
-_PREDICT_DIST = r"C:\Users\tanay\predicttion\wass_dist\wass_1.11_win32_x64\dist\bin"
-_SCRATCH_DIST = r"C:\Users\tanay\.gemini\antigravity\scratch\wass_dist\wass_1.11_win32_x64\dist\bin"
-WASS_BIN_DIR = _LOCAL_DIST if os.path.exists(_LOCAL_DIST) else (_WEBAPP_DIST if os.path.exists(_WEBAPP_DIST) else (_PREDICT_DIST if os.path.exists(_PREDICT_DIST) else _SCRATCH_DIST))
+_ENV_DIST = os.getenv("WASS_BIN_DIR", "")
 
+WASS_BIN_DIR = _ENV_DIST if (_ENV_DIST and os.path.exists(_ENV_DIST)) else (_LOCAL_DIST if os.path.exists(_LOCAL_DIST) else _WEBAPP_DIST)
 
 
 def get_wass_binaries():
-    """Locate WASS binaries."""
-    binaries = {
-        "wass_prepare": os.path.join(WASS_BIN_DIR, "wass_prepare.exe"),
-        "wass_match": os.path.join(WASS_BIN_DIR, "wass_match.exe"),
-        "wass_autocalibrate": os.path.join(WASS_BIN_DIR, "wass_autocalibrate.exe"),
-        "wass_stereo": os.path.join(WASS_BIN_DIR, "wass_stereo.exe"),
-    }
-    for name, path in binaries.items():
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"WASS binary {name} not found at {path}")
+    """Locate WASS binaries across Windows, Linux, and custom build environments."""
+    ext = ".exe" if sys.platform == "win32" else ""
+    names = ["wass_prepare", "wass_match", "wass_autocalibrate", "wass_stereo"]
+    binaries = {}
+
+    for name in names:
+        bin_name = name + ext
+        # 1. Check configured WASS_BIN_DIR
+        candidate = os.path.join(WASS_BIN_DIR, bin_name)
+        if os.path.exists(candidate):
+            binaries[name] = candidate
+            continue
+        # 2. Check system PATH
+        in_path = shutil.which(name) or shutil.which(bin_name)
+        if in_path and os.path.exists(in_path):
+            binaries[name] = in_path
+            continue
+        # 3. Check linux /usr/local/bin or /opt/wass/bin
+        for sys_dir in ["/usr/local/bin", "/opt/wass/bin", "/usr/bin"]:
+            sys_cand = os.path.join(sys_dir, name)
+            if os.path.exists(sys_cand):
+                binaries[name] = sys_cand
+                break
+        if name not in binaries:
+            raise FileNotFoundError(
+                f"WASS C++ binary '{name}' not found. "
+                "In cloud/Codespaces environments, use the Python Optical Rig mode or set WASS_BIN_DIR."
+            )
     return binaries
 
 
@@ -322,7 +339,7 @@ def main():
     parser.add_argument("--video1", type=str, help="Path to Cam1 video file")
     parser.add_argument("--video-sbs", type=str, help="Path to Side-by-Side stereo video file")
     parser.add_argument("--calib-dir", type=str, help="Path to calibration config directory")
-    parser.add_argument("--work-dir", type=str, default=r"C:\Users\tanay\.gemini\antigravity\scratch\wass_video_workspace", help="Working directory")
+    parser.add_argument("--work-dir", type=str, default=os.path.join(BASE_DIR, "workspace"), help="Working directory")
     parser.add_argument("--step", type=int, default=1, help="Frame step/skip factor")
     parser.add_argument("--max-frames", type=int, default=10, help="Maximum number of frames to process")
 

@@ -92,3 +92,16 @@ def test_edge_cases():
     assert client.get("/api/sequence/frame/-1").status_code == 404
     assert client.get("/api/sequence/frame/999").status_code == 404
     assert client.get("/api/sequence/frame/invalid").status_code == 422
+
+
+def test_pipeline_fallback_resilience():
+    """Verify run_pipeline_worker falls back gracefully without unhandled crashes when binaries are missing."""
+    from unittest.mock import patch
+    from app import run_pipeline_worker
+
+    with patch("app.get_wass_binaries", side_effect=FileNotFoundError("Mock missing binary")):
+        with patch("app.run_stereo_stream_worker") as mock_worker:
+            run_pipeline_worker(None, None, None, max_frames=2, step=1, use_sample="synthetic")
+            mock_worker.assert_called_once_with("pair1", 2, 1, custom_cam0=None, custom_cam1=None)
+
+
