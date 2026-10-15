@@ -233,8 +233,8 @@ Tab 2 provides the batch processing engine for ingesting raw stereo video footag
 ### Option 2: Local Installation (Windows / Linux / macOS)
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/tanay1904/wass-ocean-wave-stereo.git
-   cd wass-ocean-wave-stereo
+   git clone https://github.com/tanay1904/WASS_Web_App.git
+   cd WASS_Web_App
    ```
 
 2. **Create a virtual environment:**
