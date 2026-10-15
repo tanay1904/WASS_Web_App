@@ -1,6 +1,8 @@
 {
   "name": "WASS 3D Sea Wave Reconstruction Studio",
-  "image": "mcr.microsoft.com/devcontainers/python:3.10",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {}
   },
@@ -27,7 +29,8 @@
     }
   },
   "waitFor": "postStartCommand",
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 tmux && pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true && pip install --upgrade pip && pip install -r requirements.txt && pip install -e . && chmod +x .devcontainer/start-server.sh",
+  "updateContentCommand": "pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true && pip install --no-cache-dir -r requirements.txt && pip install -e .",
+  "postCreateCommand": "chmod +x .devcontainer/start-server.sh",
   "postStartCommand": "bash .devcontainer/start-server.sh",
   "remoteUser": "vscode"
 }
