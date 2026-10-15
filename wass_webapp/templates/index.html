@@ -1,0 +1,2245 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="linear">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>WASS - 3D Ocean Wave Stereophotogrammetry Studio</title>
+  
+  <!-- Embedded SVG Favicon (Instant zero-latency load, immune to 404 spinner) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>">
+  
+  <!-- Local Vendor CSS (Immune to Edge Tracking Prevention and offline networks) -->
+  <link href="/static/vendor/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/vendor/all.min.css" rel="stylesheet">
+
+  <!-- Local Vendor Scripts (Three.js & OrbitControls) -->
+  <script src="/static/vendor/three.min.js"></script>
+  <script src="/static/vendor/OrbitControls.js"></script>
+
+  <!-- Typography: Inter & JetBrains Mono (with graceful sans-serif fallback) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+
+  <style>
+    :root, [data-theme="linear"] {
+      --bg-base: #080b11;
+      --bg-surface: #0e131d;
+      --bg-surface-elevated: #141b29;
+      --bg-input: #090d15;
+      --border-subtle: #1c2436;
+      --border-focus: #3b82f6;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-primary: #38bdf8;
+      --accent-success: #10b981;
+      --accent-warning: #f59e0b;
+      --accent-danger: #ef4444;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    [data-theme="grafana"] {
+      --bg-base: #0a0b0e;
+      --bg-surface: #111217;
+      --bg-surface-elevated: #181b20;
+      --bg-input: #0a0b0d;
+      --border-subtle: #22252c;
+      --border-focus: #f59e0b;
+      --text-primary: #f9fafb;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent-primary: #f59e0b;
+      --accent-success: #22c55e;
+      --accent-warning: #eab308;
+      --accent-danger: #f43f5e;
+      --font-sans: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    [data-theme="blender"] {
+      --bg-base: #121316;
+      --bg-surface: #1a1c22;
+      --bg-surface-elevated: #242730;
+      --bg-input: #121316;
+      --border-subtle: #2d313c;
+      --border-focus: #60a5fa;
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+      --accent-primary: #3b82f6;
+      --accent-success: #34d399;
+      --accent-warning: #fbbf24;
+      --accent-danger: #f87171;
+      --font-sans: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html, body {
+      height: 100vh;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      display: flex;
+      flex-direction: column;
+      letter-spacing: -0.01em;
+    }
+
+    .cockpit-header {
+      height: 48px;
+      min-height: 48px;
+      padding: 0.35rem 1.25rem;
+      flex-shrink: 0;
+      background-color: var(--bg-surface);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .navbar-brand {
+      color: var(--text-primary);
+      font-weight: 700;
+      font-size: 1.02rem;
+      letter-spacing: -0.02em;
+    }
+
+    .cockpit-subbar {
+      height: 40px;
+      min-height: 40px;
+      padding: 0.25rem 1.25rem;
+      background-color: rgba(0, 0, 0, 0.35);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cockpit-viewport {
+      flex: 1 1 auto;
+      height: calc(100vh - 88px);
+      padding: 0.5rem 0.75rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-content {
+      height: 100%;
+      overflow: hidden;
+    }
+    .tab-content > .tab-pane {
+      display: none !important;
+      height: 100%;
+      overflow: hidden;
+    }
+    .tab-content > .tab-pane.active {
+      display: block !important;
+      height: 100%;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    /* 3-Column Zero-Scroll Cockpit Grid */
+    .studio-cockpit-grid {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 360px 1fr 410px;
+      gap: 0.55rem;
+      overflow: hidden;
+    }
+
+    @media (min-width: 1700px) {
+      .studio-cockpit-grid {
+        grid-template-columns: 390px 1fr 450px;
+        gap: 0.75rem;
+      }
+    }
+
+    @media (max-width: 1150px) {
+      html, body, .cockpit-viewport, .tab-content, .tab-pane {
+        overflow-y: auto !important;
+        height: auto !important;
+      }
+      .studio-cockpit-grid {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        gap: 0.75rem;
+      }
+    }
+
+    .cockpit-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 7px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .cockpit-card-header {
+      background-color: var(--bg-surface-elevated) !important;
+      border-bottom: 1px solid var(--border-subtle) !important;
+      font-weight: 600;
+      font-size: 0.78rem;
+      color: var(--text-primary) !important;
+      padding: 0.4rem 0.7rem;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cockpit-card-body {
+      padding: 0.55rem;
+      flex: 1 1 auto;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-tile {
+      background-color: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 5px;
+      padding: 0.4rem 0.55rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      transition: border-color 0.15s ease;
+    }
+    .stat-tile:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+    .stat-tile .stat-label {
+      font-size: 0.63rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.15rem;
+    }
+    .stat-tile .stat-value {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .stat-tile .stat-desc {
+      font-size: 0.64rem;
+      color: var(--text-secondary);
+      margin-top: 0.15rem;
+    }
+
+    .form-label {
+      color: var(--text-secondary) !important;
+      font-weight: 500;
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.25rem;
+    }
+
+    .form-control, .form-select {
+      background-color: var(--bg-input) !important;
+      border: 1px solid var(--border-subtle) !important;
+      color: var(--text-primary) !important;
+      font-size: 0.82rem;
+      border-radius: 6px;
+      padding: 0.35rem 0.6rem;
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: var(--border-focus) !important;
+      box-shadow: 0 0 0 1px var(--border-focus);
+    }
+
+    .btn-action-primary {
+      background-color: #2563eb;
+      border: 1px solid #3b82f6;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      padding: 0.35rem 0.85rem;
+      transition: all 0.15s ease;
+    }
+    .btn-action-primary:hover {
+      background-color: #1d4ed8;
+      border-color: #60a5fa;
+      color: #ffffff;
+    }
+
+    .btn-outline-custom {
+      background-color: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 0.76rem;
+      font-weight: 500;
+      border-radius: 5px;
+      padding: 0.22rem 0.6rem;
+      transition: all 0.15s ease;
+    }
+    .btn-outline-custom:hover {
+      background-color: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+    .btn-outline-custom.active {
+      background-color: var(--bg-surface-elevated);
+      color: var(--accent-primary);
+      border-color: var(--accent-primary);
+      font-weight: 600;
+    }
+
+    .pill-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 0.18rem 0.48rem;
+      border-radius: 4px;
+      font-weight: 500;
+      border: 1px solid var(--border-subtle);
+      background-color: var(--bg-input);
+      color: var(--text-secondary);
+    }
+
+    #canvasContainer {
+      width: 100%;
+      flex: 1 1 auto;
+      min-height: 180px;
+      background-color: #05070a;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .player-bar {
+      background-color: var(--bg-input);
+      border-radius: 6px;
+      padding: 5px 8px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .hist-canvas-box {
+      height: 130px;
+      min-height: 130px;
+      background-color: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 5px;
+      padding: 4px 6px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .table-container-scroll {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid var(--border-subtle);
+      border-radius: 5px;
+      background-color: var(--bg-surface-elevated);
+      min-height: 100px;
+    }
+    .table-container-scroll::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    .table-container-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+    }
+    .table-container-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .table-dark-custom {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.68rem;
+      color: var(--text-primary);
+    }
+    .table-dark-custom th {
+      position: sticky;
+      top: 0;
+      background-color: var(--bg-surface);
+      color: var(--text-muted);
+      font-size: 0.58rem;
+      line-height: 1.15;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      padding: 0.24rem 0.10rem;
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 2;
+    }
+    .table-dark-custom td {
+      padding: 0.20rem 0.10rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-family: var(--font-mono);
+      white-space: nowrap;
+    }
+    .table-dark-custom tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.012);
+    }
+
+    .processor-grid {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 0.65rem;
+      overflow: hidden;
+    }
+    @media (max-width: 1000px) {
+      .processor-grid {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+      }
+    }
+
+    .console-terminal {
+      background-color: #040609;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      flex: 1 1 auto;
+      height: 100%;
+      min-height: 250px;
+      overflow-y: auto;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      line-height: 1.45;
+    }
+
+    input[type=range].timeline-range {
+      accent-color: var(--accent-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar (Cockpit Header) -->
+  <header class="cockpit-header">
+    <div class="d-flex align-items-center gap-3">
+      <a class="navbar-brand d-flex align-items-center gap-2 mb-0" href="#">
+        <i class="fa-solid fa-water text-info fs-5"></i>
+        <span>WASS</span>
+        <span class="text-secondary fw-normal fs-6">| 3D Sea Wave Reconstruction</span>
+      </a>
+      <span class="pill-badge text-success"><i class="fa-solid fa-circle me-1" style="font-size: 0.5rem;"></i> Optical Rig Active</span>
+      <span class="pill-badge">GoPro Binocular Rig (0.88m Baseline)</span>
+    </div>
+
+    <!-- Right Controls: Theme Style Selector & Quick Navigation -->
+    <div class="d-flex align-items-center gap-2">
+      <!-- Visual Theme Switcher -->
+      <div class="d-flex align-items-center gap-1 me-2">
+        <span class="small text-muted me-1"><i class="fa-solid fa-palette me-1"></i>Theme:</span>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-custom active" id="btnThemeLinear" onclick="setAppTheme('linear')" title="Linear Slate Theme (Obsidian & Cyan)">Slate</button>
+          <button type="button" class="btn btn-outline-custom" id="btnThemeGrafana" onclick="setAppTheme('grafana')" title="Grafana Mission Control (Charcoal & Amber)">Mission</button>
+          <button type="button" class="btn btn-outline-custom" id="btnThemeBlender" onclick="setAppTheme('blender')" title="Blender Studio Dark (Neutral Monochrome)">Studio</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-outline-custom" onclick="switchToProcessorTab()">
+        <i class="fa-solid fa-sliders me-1"></i> Pipeline Configuration
+      </button>
+    </div>
+  </header>
+
+  <!-- Cockpit Subbar (Tabs & Sequence Status) -->
+  <div class="cockpit-subbar">
+    <ul class="nav nav-pills gap-2" id="studioTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="btn btn-outline-custom active px-3 py-1 fw-semibold" id="tabPlayerBtn" onclick="showTab('player')" type="button">
+          <i class="fa-solid fa-chart-area me-2 text-info"></i> 1. Wave Studio & Continuous Stereo Player
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="btn btn-outline-custom px-3 py-1 fw-semibold" id="tabProcessorBtn" onclick="showTab('processor')" type="button">
+          <i class="fa-solid fa-gears me-2 text-warning"></i> 2. Pipeline Processor & Frame Batch Renderer
+        </button>
+      </li>
+    </ul>
+    <div class="d-flex align-items-center gap-2">
+      <span class="pill-badge text-info border border-info border-opacity-25" id="framesActiveBadge"><i class="fa-solid fa-bolt me-1"></i> 150 Frames Active</span>
+      <span class="pill-badge" id="systemStateBadge"><i class="fa-solid fa-check text-success me-1"></i> Ready</span>
+    </div>
+  </div>
+
+  <!-- Cockpit Viewport (Zero-Scroll Container) -->
+  <main class="cockpit-viewport">
+    <div class="tab-content" id="mainTabContent">
+      
+      <!-- Tab 1: 3D Wave Studio & Continuous Player (3-Column Grid) -->
+      <div class="tab-pane active" id="tabPlayer" role="tabpanel">
+        <div class="studio-cockpit-grid">
+
+          <!-- Column 1: Synchronized Video Player, Scrubber, Disparity & Dataset Selector -->
+          <div class="cockpit-card h-100 d-flex flex-column overflow-hidden" id="videoStreamCard">
+            <div class="cockpit-card-header">
+              <span><i class="fa-solid fa-film me-2 text-primary"></i> Synchronized Video Streams</span>
+              <span class="pill-badge" id="frameCounterBadge">Frame 00 / 149</span>
+            </div>
+            <div class="cockpit-card-body gap-2 overflow-y-auto p-2 d-flex flex-column">
+              
+              <!-- Stream View Mode Toolbar -->
+              <div class="d-flex justify-content-between align-items-center flex-shrink-0">
+                <div class="btn-group btn-group-sm" role="group" id="streamModeGroup">
+                  <button type="button" class="btn btn-outline-custom py-0 px-2 active" id="btnStreamDual" onclick="setStreamMode('dual')" title="Side-by-side view of both synchronized stereo cameras">
+                    <i class="fa-solid fa-table-columns me-1"></i> Dual Streams (SBS)
+                  </button>
+                  <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamLeft" onclick="setStreamMode('left')" title="Left Camera Cam 0 (GX010077)">
+                    <i class="fa-solid fa-camera me-1"></i> Cam 0 (Left)
+                  </button>
+                  <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamRight" onclick="setStreamMode('right')" title="Right Camera Cam 1 (GX011273)">
+                    <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right)
+                  </button>
+                </div>
+                <span class="pill-badge" id="streamModeBadge">Dual Stereo (SBS)</span>
+              </div>
+
+              <!-- Video Viewport -->
+              <div class="position-relative text-center bg-dark rounded border overflow-hidden flex-shrink-0" style="border-color: var(--border-subtle) !important;">
+                <!-- Dual View (Side-by-Side) -->
+                <div id="dualStreamContainer" class="d-flex w-100">
+                  <div class="position-relative w-50 border-end" style="border-color: var(--border-subtle) !important;">
+                    <img id="liveVideoPlayerLeft" src="/workspace/sequence/video_frame_left_000.jpg" class="img-fluid w-100" style="max-height: 140px; min-height: 90px; object-fit: contain;" alt="Cam 0 Left">
+                    <div class="position-absolute bottom-0 start-0 m-1 px-1 py-0 rounded bg-dark bg-opacity-75 font-monospace text-warning" style="font-size: 0.65rem;">
+                      Cam 0 (Left)
+                    </div>
+                  </div>
+                  <div class="position-relative w-50">
+                    <img id="liveVideoPlayerRight" src="/workspace/sequence/video_frame_right_000.jpg" class="img-fluid w-100" style="max-height: 140px; min-height: 90px; object-fit: contain;" alt="Cam 1 Right">
+                    <div class="position-absolute bottom-0 start-0 m-1 px-1 py-0 rounded bg-dark bg-opacity-75 font-monospace text-info" style="font-size: 0.65rem;">
+                      Cam 1 (Right)
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Single View (Left, Right, or Blend) -->
+                <div id="singleStreamContainer" class="position-relative d-none">
+                  <img id="liveVideoPlayerSingle" src="/workspace/sequence/video_frame_left_000.jpg" class="img-fluid w-100" style="max-height: 140px; min-height: 90px; object-fit: contain;" alt="Single Video Feed">
+                  <div class="position-absolute bottom-0 start-0 m-1 px-1 py-0 rounded bg-dark bg-opacity-75 font-monospace text-info" style="font-size: 0.65rem;" id="camTagBadge">
+                    GoPro Cam 0 (GX010077)
+                  </div>
+                </div>
+              </div>
+
+              <!-- Playback Controls -->
+              <div class="player-bar flex-shrink-0">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-custom py-0 px-2" onclick="stepFrame(-1)" title="Previous Frame"><i class="fa-solid fa-backward-step"></i></button>
+                    <button type="button" class="btn btn-action-primary py-0 px-3" id="playBtn" onclick="togglePlayback()"><i class="fa-solid fa-play me-1"></i> Play</button>
+                    <button type="button" class="btn btn-outline-custom py-0 px-2" onclick="stepFrame(1)" title="Next Frame"><i class="fa-solid fa-forward-step"></i></button>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="small text-muted" style="font-size: 0.72rem;">Rate:</span>
+                    <select class="form-select form-select-sm w-auto py-0 px-2" style="font-size: 0.72rem;" id="fpsSelect" onchange="changeSpeed()">
+                      <option value="5">5 FPS</option>
+                      <option value="10" selected>10 FPS</option>
+                      <option value="15">15 FPS</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Scrubber -->
+                <div class="d-flex align-items-center gap-2">
+                  <small class="text-muted font-monospace" style="font-size: 0.7rem;">0</small>
+                  <input type="range" class="form-range timeline-range" id="timelineSlider" min="0" max="149" value="0" oninput="onScrub(this.value)">
+                  <small class="text-muted font-monospace" style="font-size: 0.7rem;" id="maxFrameLabel">149</small>
+                </div>
+              </div>
+
+              <!-- Disparity Map Preview -->
+              <div class="flex-shrink-0">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="stat-label mb-0"><i class="fa-solid fa-water text-warning me-1"></i> Dense Stereo Disparity / Sea Depth Field</span>
+                </div>
+                <div class="text-center bg-dark rounded border overflow-hidden" style="border-color: var(--border-subtle) !important;">
+                  <img id="liveDispPlayer" src="/workspace/sequence/disparity_000.png?t=v3" class="img-fluid" style="max-height: 120px; width: 100%; object-fit: contain;" alt="Disparity Depth Map">
+                </div>
+              </div>
+
+              <!-- Active Dataset Selector Section -->
+              <div class="p-2 rounded mt-auto flex-shrink-0" style="background-color: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);">
+                <div class="stat-label mb-1"><i class="fa-solid fa-database me-1 text-secondary"></i> Active Dataset</div>
+                <select class="form-select form-select-sm" id="datasetSelector" onchange="onDatasetChange()">
+                  <option value="sequence" selected>Continuous Playback Stream (150 Synchronized Frames)</option>
+                  <option value="Pair1_Vid1">Static Benchmark: Pair 1 Frame 0 (GX010077 & GX011273)</option>
+                  <option value="Pair2_Vid2">Static Benchmark: Pair 2 Frame 0 (GX010078 & GX011274)</option>
+                  <option value="WASS_HighDensity_350k">Static Benchmark: WASS High-Density (350k Points)</option>
+                </select>
+                <div class="stat-desc mt-1" style="font-size: 0.68rem;">
+                  <i class="fa-solid fa-circle-info me-1 text-info"></i> In continuous mode, video and 3D surface mesh undulate dynamically in time.
+                </div>
+              </div>
+
+            </div>
+          </div><!-- /Column 1 -->
+
+          <!-- Column 2: Center - Interactive 3D Sea Wave Surface (Three.js WebGL) -->
+          <div class="cockpit-card h-100 d-flex flex-column overflow-hidden">
+            <div class="cockpit-card-header">
+              <span><i class="fa-solid fa-cube me-2 text-info"></i> Interactive 3D Sea Wave Surface (Three.js WebGL)</span>
+              <div class="d-flex align-items-center gap-2">
+                <div class="btn-group btn-group-sm" role="group">
+                  <button type="button" class="btn btn-outline-custom active py-0 px-2" id="btnModeSurface" onclick="setRenderMode('surface')"><i class="fa-solid fa-water me-1"></i> Surface</button>
+                  <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnModeWireframe" onclick="setRenderMode('wireframe')"><i class="fa-solid fa-border-none me-1"></i> Wireframe</button>
+                  <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnModePoints" onclick="setRenderMode('points')"><i class="fa-solid fa-braille me-1"></i> Point Cloud</button>
+                </div>
+                <button type="button" class="btn btn-outline-custom active py-0 px-2" id="btnToggleRangeArcs" onclick="toggleRangeArcs()" title="Toggle 5m Range Rings"><i class="fa-solid fa-bullseye me-1 text-info"></i> 5m Arcs</button>
+                <span class="pill-badge" id="pointCountBadge">7,000 Vertices</span>
+              </div>
+            </div>
+            <div class="cockpit-card-body p-2 d-flex flex-column flex-grow-1 overflow-hidden">
+              
+              <!-- 3D Canvas Container -->
+              <div id="canvasContainer" class="flex-grow-1 position-relative">
+                <div id="loading3D" class="position-absolute top-50 start-50 translate-middle text-center d-none">
+                  <div class="spinner-border text-info mb-2" role="status"></div>
+                  <div class="small text-muted font-monospace">Updating 3D Mesh...</div>
+                </div>
+              </div>
+
+              <!-- Interaction Toolbar -->
+              <div class="d-flex justify-content-between align-items-center mt-1 px-1 flex-shrink-0">
+                <span class="small text-muted font-monospace" style="font-size: 0.72rem;"><i class="fa-solid fa-arrows-up-down-left-right me-1"></i> Left: Rotate | Right: Pan | Scroll: Zoom</span>
+                <button type="button" class="btn btn-outline-custom btn-sm py-0 px-2" style="font-size: 0.72rem;" onclick="resetCamera()"><i class="fa-solid fa-camera-rotate me-1"></i> Reset View</button>
+              </div>
+
+              <!-- Instrument Specifications Strip -->
+              <div class="mt-1 p-1 px-2 rounded flex-shrink-0" style="background-color: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);">
+                <div class="row g-1 text-center small" style="font-size: 0.72rem;">
+                  <div class="col-4 border-end" style="border-color: var(--border-subtle) !important;">
+                    <span class="text-muted">Stereo Rig Baseline:</span>
+                    <span class="font-monospace text-info ms-1">0.88 meters (36 deg conv.)</span>
+                  </div>
+                  <div class="col-4 border-end" style="border-color: var(--border-subtle) !important;">
+                    <span class="text-muted">Regularized Grid:</span>
+                    <span class="font-monospace text-success ms-1">100 x 70 (13.6k Triangles)</span>
+                  </div>
+                  <div class="col-4">
+                    <span class="text-muted">Elevation Colormap:</span>
+                    <span class="font-monospace text-info ms-1">Deep Navy (Trough) -> Seafoam (Crest)</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div><!-- /Column 2 -->
+
+          <!-- Column 3: Right - Oceanographic Wave Telemetry & Distribution -->
+          <div class="cockpit-card h-100 d-flex flex-column overflow-hidden" id="telemetryCard">
+            <div class="cockpit-card-header">
+              <div>
+                <i class="fa-solid fa-chart-line text-success me-2"></i>
+                <strong>Oceanographic Wave Telemetry (Point Cloud Derivations)</strong>
+                <span class="pill-badge ms-1" id="analysisTargetBadge">Frame 00</span>
+              </div>
+              <a id="btnDownloadCsv" href="/api/wave_analysis/export/frame_000" class="btn btn-outline-custom btn-sm py-0 px-2" style="font-size: 0.72rem;" download>
+                <i class="fa-solid fa-file-arrow-down me-1"></i> Export Annotated CSV / XYZ
+              </a>
+            </div>
+            <div class="cockpit-card-body p-2 d-flex flex-column gap-2 overflow-hidden">
+              
+              <!-- Telemetry HUD Metric Tiles (2x2 Grid) -->
+              <div class="row g-2 text-center flex-shrink-0">
+                <div class="col-6">
+                  <div class="stat-tile">
+                    <div class="stat-label"><i class="fa-solid fa-eye me-1 text-info"></i> Observer Altitude</div>
+                    <div class="stat-value text-info" id="statObsHeight">-- m</div>
+                    <div class="stat-desc">Above Mean Sea Level</div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-tile">
+                    <div class="stat-label"><i class="fa-solid fa-water me-1 text-primary"></i> Significant Wave Height (Hs)</div>
+                    <div class="stat-value text-primary" id="statHs">-- m</div>
+                    <div class="stat-desc">4 x Elevation Std Dev (sigma)</div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-tile">
+                    <div class="stat-label"><i class="fa-solid fa-arrows-left-right me-1 text-success"></i> Optical Distance</div>
+                    <div class="stat-value text-success" id="statDistRange">-- m</div>
+                    <div class="stat-desc" id="statDistMean">Mean: -- m</div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="stat-tile">
+                    <div class="stat-label"><i class="fa-solid fa-arrows-up-down me-1 text-warning"></i> Extrema (Crest / Trough)</div>
+                    <div class="stat-value text-warning" id="statCrestTrough">-- / -- m</div>
+                    <div class="stat-desc">Relative to Sea Plane (0.00m)</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Elevation Distribution Histogram -->
+              <div class="flex-shrink-0">
+                <div class="stat-label mb-1"><i class="fa-solid fa-chart-column me-1 text-info"></i> Sea Surface Elevation Probability Distribution</div>
+                <div class="hist-canvas-box">
+                  <canvas id="elevationHistCanvas" style="width: 100%; height: 100%;"></canvas>
+                </div>
+                <div class="d-flex justify-content-between small text-muted mt-1 px-1 font-monospace" style="font-size: 0.68rem;">
+                  <span>Trough (<span id="labelMinTrough">-1.5m</span>)</span>
+                  <span class="text-info">Mean Sea Level (0.00m)</span>
+                  <span>Crest (<span id="labelMaxCrest">+1.5m</span>)</span>
+                </div>
+              </div>
+
+              <!-- 5m Circular Arcs Around Boat Table -->
+              <div class="d-flex flex-column flex-grow-1 overflow-hidden">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="stat-label mb-0"><i class="fa-solid fa-bullseye me-1 text-info"></i> 5m Circular Arcs Around Boat (WASS Logs)</div>
+                  <button type="button" class="btn btn-outline-custom py-0 px-2" style="font-size: 0.65rem;" onclick="exportCurrentArcsCsv()" title="Export 5m Circular Arcs CSV">
+                    <i class="fa-solid fa-download me-1 text-info"></i> Export Arcs CSV
+                  </button>
+                </div>
+                <div class="table-container-scroll flex-grow-1">
+                  <table class="table-dark-custom text-center align-middle mb-0" id="tableDistanceProfile">
+                    <thead>
+                      <tr>
+                        <th>Arc<br>Radius</th>
+                        <th>Range<br>Band</th>
+                        <th>Vertices</th>
+                        <th>Mean<br>Elev</th>
+                        <th>Peak<br>Crest</th>
+                        <th>Deepest<br>Trough</th>
+                        <th>Wave<br>Amp</th>
+                        <th>Sig. Ht<br>(Hs)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbodyDistanceProfile">
+                      <tr><td colspan="8" class="text-muted py-2">Loading 5m circular arc telemetry...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div><!-- /Column 3 -->
+
+        </div>
+      </div><!-- /#tabPlayer -->
+
+      <!-- Tab 2: Pipeline Processor & Frame Batch Renderer -->
+      <div class="tab-pane" id="tabProcessor" role="tabpanel">
+        <div class="processor-grid">
+
+          <!-- Left Column: Source Selection & Parameters -->
+          <div class="cockpit-card h-100 overflow-hidden">
+            <div class="cockpit-card-header">
+              <span><i class="fa-solid fa-sliders me-2 text-warning"></i> <strong>Pipeline Configuration & Ingestion</strong></span>
+            </div>
+            <div class="cockpit-card-body p-3 overflow-y-auto">
+              <form id="pipelineForm">
+                <div class="mb-3">
+                  <label class="form-label"><i class="fa-solid fa-video me-1"></i> Input Video Stereo Pair</label>
+                  <select class="form-select" id="videoSource" onchange="toggleSourceInputs()">
+                    <option value="pair1" selected>GoPro Pair 1: GX010077 (Left) & GX011273 (Right)</option>
+                    <option value="pair2">GoPro Pair 2: GX010078 (Left) & GX011274 (Right)</option>
+                    <option value="sample">WASS Verification Synthetic Benchmark (350k Inliers)</option>
+                    <option value="dual">Custom Dual Camera Upload (Cam 0 & Cam 1 MP4)</option>
+                    <option value="sbs">Side-by-Side (SBS) Stereo Video Upload</option>
+                  </select>
+                </div>
+
+                <!-- Dual video inputs -->
+                <div id="dualInputs" class="d-none">
+                  <div class="mb-2">
+                    <label class="form-label">Cam 0 (Left Video)</label>
+                    <input type="file" class="form-control" id="cam0File" accept="video/*">
+                  </div>
+                  <div class="mb-2">
+                    <label class="form-label">Cam 1 (Right Video)</label>
+                    <input type="file" class="form-control" id="cam1File" accept="video/*">
+                  </div>
+                </div>
+
+                <!-- SBS video input -->
+                <div id="sbsInputs" class="d-none">
+                  <div class="mb-2">
+                    <label class="form-label">Side-by-Side Stereo File</label>
+                    <input type="file" class="form-control" id="sbsFile" accept="video/*">
+                  </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label"><i class="fa-solid fa-film me-1"></i> Frames to Reconstruct</label>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="maxFrames" value="100" min="1" max="50000">
+                    <div class="stat-desc">Target sequence duration (e.g. 100, 500, 1000)</div>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label"><i class="fa-solid fa-forward-step me-1"></i> Frame Step / Stride</label>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="frameStep" value="1" min="1" max="120">
+                    <div class="stat-desc">1 = 30 FPS, 3 = 10 FPS, 30 = 1 FPS</div>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label"><i class="fa-solid fa-layer-group me-1"></i> Reconstruction Mode</label>
+                  <select class="form-select" id="reconstructQuality">
+                    <option value="wass_cpp" selected>Full WASS C++ Binaries (Prepare -> Match -> SBA -> Stereo)</option>
+                    <option value="flow_grid">Regularized Surface Grid (100 x 70, Zero Noise)</option>
+                  </select>
+                </div>
+
+                <button type="button" class="btn btn-action-primary w-100 py-2 fw-bold" id="startBtn" onclick="startPipeline()">
+                  <i class="fa-solid fa-play me-2"></i> Start 3D Reconstruction Pipeline
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Right Column: Terminal Logs & Progress -->
+          <div class="cockpit-card h-100 d-flex flex-column overflow-hidden">
+            <div class="cockpit-card-header">
+              <div>
+                <i class="fa-solid fa-terminal me-2 text-secondary"></i>
+                <strong>Execution Terminal & Telemetry Logs</strong>
+              </div>
+              <span class="pill-badge" id="stageBadge">Idle</span>
+            </div>
+            <div class="cockpit-card-body p-3 d-flex flex-column overflow-hidden">
+              
+              <!-- Progress Bar -->
+              <div class="progress mb-2 border flex-shrink-0" style="height: 22px; background-color: var(--bg-input); border-color: var(--border-subtle) !important;">
+                <div class="progress-bar bg-success font-monospace small fw-bold" id="progressBar" role="progressbar" style="width: 0%; min-width: 70px;">Ready</div>
+              </div>
+
+              <!-- Completion Banner -->
+              <div id="completionBanner" class="alert alert-success d-flex justify-content-between align-items-center d-none mb-2 py-2 px-3 small flex-shrink-0">
+                <div>
+                  <i class="fa-solid fa-circle-check me-2 text-success"></i>
+                  <strong id="completionText">Reconstruction Complete.</strong>
+                </div>
+                <button type="button" class="btn btn-action-primary btn-sm py-1 px-3" onclick="openRenderedInStudio()">
+                  <i class="fa-solid fa-play me-1"></i> Open in 3D Wave Studio
+                </button>
+              </div>
+
+              <!-- Console Output -->
+              <div id="logConsole" class="console-terminal flex-grow-1">
+                Ready. Select video source, choose number of frames to render, and click "Start 3D Reconstruction Pipeline".
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /#tabProcessor -->
+
+    </div><!-- /#mainTabContent -->
+  </main><!-- /.cockpit-viewport -->
+
+  <script>
+    // Theme Switcher Logic
+    function setAppTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.getElementById('btnThemeLinear').classList.toggle('active', theme === 'linear');
+      document.getElementById('btnThemeGrafana').classList.toggle('active', theme === 'grafana');
+      document.getElementById('btnThemeBlender').classList.toggle('active', theme === 'blender');
+      
+      // Update Three.js scene background color to match theme
+      if (scene) {
+        if (theme === 'linear') scene.background = new THREE.Color(0x05070a);
+        else if (theme === 'grafana') scene.background = new THREE.Color(0x060709);
+        else if (theme === 'blender') scene.background = new THREE.Color(0x0e0f12);
+      }
+    }
+
+    // State
+    let isPlaying = false;
+    let currentFrame = 0;
+    let totalFrames = 369;
+    let playbackTimeout = null;
+    let playbackSpeed = 100; // ms per frame (10 FPS)
+    let mode = 'sequence'; // 'sequence' or 'static'
+    let renderMode = 'surface'; // 'surface', 'wireframe', 'points'
+    let frameCache = {};
+    let analysisCache = {};
+    let isFrameLoading = false;
+    let lastFrameLoadingStart = 0;
+    let initialCameraFitted = false;
+    let currentRawPts = null;
+    let currentStreamMode = 'dual';
+
+    // Three.js 3D Viewport Setup
+    let scene, camera, renderer, controls, current3DObject;
+    let container = null;
+
+    // High-performance Three.js 3D sea mesh state (zero allocation on frame tick)
+    const gridW = 100, gridH = 70;
+    const totalGridPoints = gridW * gridH;
+    let seaGeometry = null;
+    let seaMeshMaterial = null;
+    let seaWireMaterial = null;
+    let seaPointsMaterial = null;
+    let seaMesh = null;
+    let seaPoints = null;
+    let posAttr = null;
+    let colAttr = null;
+    let rangeArcsGroup = null;
+    let rangeArcsVisible = true;
+    let rangeArcObjects = [];
+    let vesselBowObject = null;
+
+    function init3D() {
+      container = document.getElementById('canvasContainer');
+      if (!container) return;
+      if (typeof THREE === 'undefined') {
+        console.warn('Three.js is still loading, retrying init3D...');
+        setTimeout(init3D, 100);
+        return;
+      }
+      if (renderer) return; // Prevent duplicate initialization
+
+      const width = Math.max(container.clientWidth, 600);
+      const height = Math.max(container.clientHeight, 400);
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x05070a);
+
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      camera.position.set(0, -6.5, 6.0);
+      camera.up.set(0, 0, 1);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      container.appendChild(renderer.domElement);
+
+      if (typeof THREE.OrbitControls !== 'undefined') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 16, 0);
+      }
+
+
+      // Coordinate reference floor grid under sea
+      const gridHelper = new THREE.GridHelper(80, 40, 0x1f6feb, 0x161b22);
+      gridHelper.rotation.x = Math.PI / 2;
+      gridHelper.position.set(-5, 25, -3.5);
+      scene.add(gridHelper);
+
+      // 3D Research Vessel Bow Model at Coordinate Origin (0, 0, 0)
+      vesselBowObject = createVesselBowModel();
+      scene.add(vesselBowObject);
+
+      // 5m Concentric Nautical Radar Range Ribbons centered at vessel (0, 0, 0)
+      rangeArcsGroup = new THREE.Group();
+      rangeArcsGroup.name = 'rangeArcsGroup';
+      const arcRadii = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+      const maxArcSegs = 180;
+      const maxArcVerts = (maxArcSegs + 1) * 2;
+
+      rangeArcObjects = [];
+      arcRadii.forEach(r => {
+        const isMajor = (r % 10 === 0);
+        const geom = new THREE.BufferGeometry();
+        const posArr = new Float32Array(maxArcVerts * 3);
+        const pAttr = new THREE.BufferAttribute(posArr, 3);
+        pAttr.setUsage(THREE.DynamicDrawUsage);
+        geom.setAttribute('position', pAttr);
+
+        // Pre-allocate quad index buffer for maxArcSegs quads (6 indices each)
+        const indices = new Uint16Array(maxArcSegs * 6);
+        for (let s = 0; s < maxArcSegs; s++) {
+          const v0 = s * 2;
+          const v1 = s * 2 + 1;
+          const v2 = (s + 1) * 2;
+          const v3 = (s + 1) * 2 + 1;
+          const i6 = s * 6;
+          indices[i6] = v0;
+          indices[i6 + 1] = v2;
+          indices[i6 + 2] = v1;
+          indices[i6 + 3] = v1;
+          indices[i6 + 4] = v2;
+          indices[i6 + 5] = v3;
+        }
+        geom.setIndex(new THREE.BufferAttribute(indices, 1));
+        geom.setDrawRange(0, 0);
+
+        const mat = new THREE.MeshBasicMaterial({
+          color: isMajor ? 0x00f0ff : 0x38bdf8,
+          transparent: true,
+          opacity: isMajor ? 0.92 : 0.75,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.frustumCulled = false;
+        rangeArcsGroup.add(mesh);
+
+        const lbl = createArcLabelSprite(`${r}m`);
+        rangeArcsGroup.add(lbl);
+
+        rangeArcObjects.push({
+          radius: r,
+          geom: geom,
+          posAttr: pAttr,
+          label: lbl,
+          mesh: mesh
+        });
+      });
+      scene.add(rangeArcsGroup);
+
+      // Ambient + Directional lighting (balanced for natural oceanic depth, no glare)
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.28);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xdbeafe, 0.65);
+      sunLight.position.set(15, 25, 35);
+      scene.add(sunLight);
+
+      // Pre-allocate persistent Sea Mesh geometry and index buffers ONCE (13.6k triangles)
+      seaGeometry = new THREE.BufferGeometry();
+      posAttr = new THREE.BufferAttribute(new Float32Array(totalGridPoints * 3), 3);
+      colAttr = new THREE.BufferAttribute(new Float32Array(totalGridPoints * 3), 3);
+      posAttr.setUsage(THREE.DynamicDrawUsage);
+      colAttr.setUsage(THREE.DynamicDrawUsage);
+
+      const indices = new Uint32Array((gridW - 1) * (gridH - 1) * 6);
+      let idx = 0;
+      for (let r = 0; r < gridH - 1; r++) {
+        for (let c = 0; c < gridW - 1; c++) {
+          const v00 = r * gridW + c;
+          const v01 = v00 + 1;
+          const v10 = (r + 1) * gridW + c;
+          const v11 = v10 + 1;
+          indices[idx++] = v00;
+          indices[idx++] = v10;
+          indices[idx++] = v01;
+          indices[idx++] = v01;
+          indices[idx++] = v10;
+          indices[idx++] = v11;
+        }
+      }
+      seaGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
+      seaGeometry.setAttribute('position', posAttr);
+      seaGeometry.setAttribute('color', colAttr);
+
+      // Persistent Materials (Natural Ocean Water Shading)
+      seaMeshMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.82,
+        metalness: 0.02,
+        side: THREE.DoubleSide,
+        flatShading: false,
+        polygonOffset: true,
+        polygonOffsetFactor: 1.0,
+        polygonOffsetUnits: 4.0
+      });
+      seaWireMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        wireframe: true,
+        side: THREE.DoubleSide
+      });
+      seaPointsMaterial = new THREE.PointsMaterial({
+        size: 1.0,
+        vertexColors: true,
+        sizeAttenuation: true
+      });
+
+      seaMesh = new THREE.Mesh(seaGeometry, seaMeshMaterial);
+      seaPoints = new THREE.Points(seaGeometry, seaPointsMaterial);
+      seaPoints.visible = false;
+      seaMesh.frustumCulled = false;
+      seaPoints.frustumCulled = false;
+      seaMesh.position.set(0, 0, 0);
+      seaPoints.position.set(0, 0, 0);
+
+      scene.add(seaMesh);
+      scene.add(seaPoints);
+
+      animate();
+    }
+
+    function createArcLabelSprite(text) {
+      const c = document.createElement('canvas');
+      c.width = 112;
+      c.height = 54;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(6, 14, 28, 0.90)';
+      if (ctx.roundRect) ctx.roundRect(0, 0, 112, 54, 8);
+      else ctx.rect(0, 0, 112, 54);
+      ctx.fill();
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 26px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 56, 27);
+      const tex = new THREE.CanvasTexture(c);
+      const sMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.95 });
+      const sp = new THREE.Sprite(sMat);
+      sp.scale.set(1.9, 0.92, 1.0);
+      return sp;
+    }
+
+    function createVesselBowModel() {
+      const boat = new THREE.Group();
+      boat.name = 'vesselBowModel';
+
+      // 1. Deck Geometry: Orange Wooden Bow extending from Y = -1.2m to Y = 4.0m (stem tip)
+      // Water mesh starts at Y = 2.5m, so Y in [2.5, 4.0] penetrates into the water with sea on both sides!
+      const deckGeom = new THREE.BufferGeometry();
+      const deckVerts = new Float32Array([
+        // Section 0 to 1 (Y: -1.2 to 0.0 under stereo mast)
+        -1.05, -1.2, 0.42,   0, -1.2, 0.40,   -0.95, 0.0, 0.50,
+        0, -1.2, 0.40,       0, 0.0, 0.48,    -0.95, 0.0, 0.50,
+        0, -1.2, 0.40,       1.05, -1.2, 0.42, 0, 0.0, 0.48,
+        1.05, -1.2, 0.42,    0.95, 0.0, 0.50,  0, 0.0, 0.48,
+
+        // Section 1 to 2 (Y: 0.0 to 1.3)
+        -0.95, 0.0, 0.50,    0, 0.0, 0.48,    -0.80, 1.3, 0.60,
+        0, 0.0, 0.48,        0, 1.3, 0.58,    -0.80, 1.3, 0.60,
+        0, 0.0, 0.48,        0.95, 0.0, 0.50,  0, 1.3, 0.58,
+        0.95, 0.0, 0.50,     0.80, 1.3, 0.60,  0, 1.3, 0.58,
+
+        // Section 2 to 3 (Y: 1.3 to 2.5 - sea mesh boundary)
+        -0.80, 1.3, 0.60,    0, 1.3, 0.58,    -0.55, 2.5, 0.72,
+        0, 1.3, 0.58,        0, 2.5, 0.70,    -0.55, 2.5, 0.72,
+        0, 1.3, 0.58,        0.80, 1.3, 0.60,  0, 2.5, 0.70,
+        0.80, 1.3, 0.60,     0.55, 2.5, 0.72,  0, 2.5, 0.70,
+
+        // Section 3 to 4 (Y: 2.5 to 3.4 - cutting through waves)
+        -0.55, 2.5, 0.72,    0, 2.5, 0.70,    -0.28, 3.4, 0.84,
+        0, 2.5, 0.70,        0, 3.4, 0.82,    -0.28, 3.4, 0.84,
+        0, 2.5, 0.70,        0.55, 2.5, 0.72,  0, 3.4, 0.82,
+        0.55, 2.5, 0.72,     0.28, 3.4, 0.84,  0, 3.4, 0.82,
+
+        // Section 4 to 5 (Y: 3.4 to 4.0 - stem tip)
+        -0.28, 3.4, 0.84,    0, 3.4, 0.82,     0, 4.0, 0.95,
+        0, 3.4, 0.82,        0.28, 3.4, 0.84,  0, 4.0, 0.95
+      ]);
+      deckGeom.setAttribute('position', new THREE.BufferAttribute(deckVerts, 3));
+      deckGeom.computeVertexNormals();
+
+      const deckMat = new THREE.MeshStandardMaterial({
+        color: 0xea580c, // Bright Kerala wooden boat orange
+        roughness: 0.50,
+        metalness: 0.08,
+        side: THREE.DoubleSide
+      });
+      boat.add(new THREE.Mesh(deckGeom, deckMat));
+
+      // 2. Port Hull Side (Down to keel line Z = -0.55m)
+      const portGeom = new THREE.BufferGeometry();
+      const portVerts = new Float32Array([
+        -1.05, -1.2, 0.42,  0, -1.2, -0.65,   -0.95, 0.0, 0.50,
+        0, -1.2, -0.65,     0, 0.0, -0.60,    -0.95, 0.0, 0.50,
+        -0.95, 0.0, 0.50,   0, 0.0, -0.60,    -0.80, 1.3, 0.60,
+        0, 0.0, -0.60,      0, 1.3, -0.52,    -0.80, 1.3, 0.60,
+        -0.80, 1.3, 0.60,   0, 1.3, -0.52,    -0.55, 2.5, 0.72,
+        0, 1.3, -0.52,      0, 2.5, -0.40,    -0.55, 2.5, 0.72,
+        -0.55, 2.5, 0.72,   0, 2.5, -0.40,    -0.28, 3.4, 0.84,
+        0, 2.5, -0.40,      0, 3.4, -0.15,    -0.28, 3.4, 0.84,
+        -0.28, 3.4, 0.84,   0, 3.4, -0.15,     0, 4.0, 0.95,
+        0, 3.4, -0.15,      0, 4.0, 0.15,      0, 4.0, 0.95
+      ]);
+      portGeom.setAttribute('position', new THREE.BufferAttribute(portVerts, 3));
+      portGeom.computeVertexNormals();
+
+      const hullMat = new THREE.MeshStandardMaterial({
+        color: 0xc2410c, // Marine dark reddish-orange hull sides
+        roughness: 0.65,
+        metalness: 0.05,
+        side: THREE.DoubleSide
+      });
+      boat.add(new THREE.Mesh(portGeom, hullMat));
+
+      // 3. Starboard Hull Side
+      const stbGeom = new THREE.BufferGeometry();
+      const stbVerts = new Float32Array([
+        1.05, -1.2, 0.42,   0.95, 0.0, 0.50,   0, -1.2, -0.65,
+        0.95, 0.0, 0.50,    0, 0.0, -0.60,     0, -1.2, -0.65,
+        0.95, 0.0, 0.50,    0.80, 1.3, 0.60,   0, 0.0, -0.60,
+        0.80, 1.3, 0.60,    0, 1.3, -0.52,     0, 0.0, -0.60,
+        0.80, 1.3, 0.60,    0.55, 2.5, 0.72,   0, 1.3, -0.52,
+        0.55, 2.5, 0.72,    0, 2.5, -0.40,     0, 1.3, -0.52,
+        0.55, 2.5, 0.72,    0.28, 3.4, 0.84,   0, 2.5, -0.40,
+        0.28, 3.4, 0.84,    0, 3.4, -0.15,     0, 2.5, -0.40,
+        0.28, 3.4, 0.84,    0, 4.0, 0.95,      0, 3.4, -0.15,
+        0, 4.0, 0.95,       0, 4.0, 0.15,      0, 3.4, -0.15
+      ]);
+      stbGeom.setAttribute('position', new THREE.BufferAttribute(stbVerts, 3));
+      stbGeom.computeVertexNormals();
+      boat.add(new THREE.Mesh(stbGeom, hullMat));
+
+      // 4. Blue Gunwale Trim Railings (Matching bright blue boat trim in video frames)
+      const railMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.35, metalness: 0.2 });
+      const portCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-1.05, -1.2, 0.44),
+        new THREE.Vector3(-0.95, 0.0, 0.52),
+        new THREE.Vector3(-0.80, 1.3, 0.62),
+        new THREE.Vector3(-0.55, 2.5, 0.74),
+        new THREE.Vector3(-0.28, 3.4, 0.86),
+        new THREE.Vector3(0, 4.0, 0.97)
+      ]);
+      const portRailGeom = new THREE.TubeGeometry(portCurve, 32, 0.035, 8, false);
+      boat.add(new THREE.Mesh(portRailGeom, railMat));
+
+      const stbCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(1.05, -1.2, 0.44),
+        new THREE.Vector3(0.95, 0.0, 0.52),
+        new THREE.Vector3(0.80, 1.3, 0.62),
+        new THREE.Vector3(0.55, 2.5, 0.74),
+        new THREE.Vector3(0.28, 3.4, 0.86),
+        new THREE.Vector3(0, 4.0, 0.97)
+      ]);
+      const stbRailGeom = new THREE.TubeGeometry(stbCurve, 32, 0.035, 8, false);
+      boat.add(new THREE.Mesh(stbRailGeom, railMat));
+
+      // 5. Bow Stem Post (Vertical wooden post at tip (0, 4.0) rising to Z = 1.70m)
+      const stemGeom = new THREE.CylinderGeometry(0.03, 0.035, 0.75, 16);
+      const stemMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+      const stemMesh = new THREE.Mesh(stemGeom, stemMat);
+      stemMesh.rotation.x = Math.PI / 2;
+      stemMesh.position.set(0, 4.0, 1.325);
+      boat.add(stemMesh);
+
+      // Rope binding coils around post base
+      const ropeGeom = new THREE.CylinderGeometry(0.042, 0.042, 0.16, 16);
+      const ropeMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.9 });
+      const ropeMesh = new THREE.Mesh(ropeGeom, ropeMat);
+      ropeMesh.rotation.x = Math.PI / 2;
+      ropeMesh.position.set(0, 4.0, 1.05);
+      boat.add(ropeMesh);
+
+      // 6. Fluttering White Flag ("ALL KERALA FISH MERCHANTS COMMISSION AGENTS ASSOCIATION")
+      // Canvas Texture matching real vessel flag
+      const flagCanvas = document.createElement('canvas');
+      flagCanvas.width = 512;
+      flagCanvas.height = 320;
+      const fctx = flagCanvas.getContext('2d');
+      fctx.fillStyle = '#f8fafc';
+      fctx.fillRect(0, 0, 512, 320);
+
+      fctx.strokeStyle = '#94a3b8';
+      fctx.lineWidth = 3;
+      fctx.strokeRect(4, 4, 504, 312);
+
+      // Blue / Cyan Fish Emblem
+      fctx.fillStyle = '#0284c7';
+      fctx.beginPath();
+      fctx.ellipse(130, 110, 55, 26, -Math.PI / 12, 0, Math.PI * 2);
+      fctx.fill();
+      fctx.beginPath();
+      fctx.moveTo(170, 110);
+      fctx.lineTo(215, 82);
+      fctx.lineTo(215, 138);
+      fctx.closePath();
+      fctx.fill();
+
+      // Flag Text
+      fctx.fillStyle = '#0369a1';
+      fctx.font = 'bold 22px sans-serif';
+      fctx.textAlign = 'center';
+      fctx.fillText('ALL KERALA', 330, 80);
+      fctx.font = 'bold 19px sans-serif';
+      fctx.fillText('FISH MERCHANTS', 330, 112);
+      fctx.font = 'bold 16px sans-serif';
+      fctx.fillText('COMMISSION AGENTS', 330, 142);
+      fctx.font = 'bold 22px sans-serif';
+      fctx.fillStyle = '#0f172a';
+      fctx.fillText('ASSOCIATION', 256, 215);
+
+      const flagTex = new THREE.CanvasTexture(flagCanvas);
+      const flagCols = 16, flagRows = 8;
+      const flagGeom = new THREE.PlaneGeometry(0.70, 0.42, flagCols, flagRows);
+      flagGeom.translate(-0.35, 0, 0); // Attach right edge to stem post at X = 0
+      const flagPos = flagGeom.attributes.position.array;
+      for (let vi = 0; vi < flagPos.length; vi += 3) {
+        const vx = flagPos[vi]; // in [-0.70, 0]
+        const factor = Math.abs(vx) / 0.70;
+        flagPos[vi + 2] = Math.sin(factor * Math.PI * 2.4) * 0.06 * factor; // wave ripple
+      }
+      flagGeom.computeVertexNormals();
+
+      const flagMat = new THREE.MeshStandardMaterial({
+        map: flagTex,
+        roughness: 0.85,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      });
+      const flagMesh = new THREE.Mesh(flagGeom, flagMat);
+      flagMesh.rotation.x = Math.PI / 2; // Lie in XZ vertical plane
+      flagMesh.position.set(0, 3.96, 1.45);
+      boat.add(flagMesh);
+
+      // 7. Stereo Camera Rig Crossbar: B = 0.88m exactly at Y = 0.0m, Z = 1.80m
+      const barMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.2 });
+      const barGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.88, 16);
+      const barMesh = new THREE.Mesh(barGeom, barMat);
+      barMesh.rotation.z = Math.PI / 2;
+      barMesh.position.set(0, 0.0, 1.80);
+      boat.add(barMesh);
+
+      // Stanchions connecting rig to vessel deck at Y = 0.0m
+      const strutGeom = new THREE.CylinderGeometry(0.02, 0.02, 1.30, 8);
+      const strutL = new THREE.Mesh(strutGeom, barMat);
+      strutL.rotation.x = Math.PI / 2;
+      strutL.position.set(-0.44, 0.0, 1.15);
+      boat.add(strutL);
+      const strutR = new THREE.Mesh(strutGeom, barMat);
+      strutR.rotation.x = Math.PI / 2;
+      strutR.position.set(0.44, 0.0, 1.15);
+      boat.add(strutR);
+
+      // Left Camera (Cam 0: GX010077)
+      const camMat = new THREE.MeshStandardMaterial({ color: 0x020617, roughness: 0.3 });
+      const lensMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+      const camGeom = new THREE.BoxGeometry(0.12, 0.09, 0.08);
+
+      const cam0Mesh = new THREE.Mesh(camGeom, camMat);
+      cam0Mesh.position.set(-0.44, 0.05, 1.80);
+      boat.add(cam0Mesh);
+      const lens0 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 16), lensMat);
+      lens0.rotation.x = Math.PI / 2;
+      lens0.position.set(-0.44, 0.10, 1.80);
+      boat.add(lens0);
+
+      // Right Camera (Cam 1: GX011273)
+      const cam1Mesh = new THREE.Mesh(camGeom, camMat);
+      cam1Mesh.position.set(0.44, 0.05, 1.80);
+      boat.add(cam1Mesh);
+      const lens1 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 16), lensMat);
+      lens1.rotation.x = Math.PI / 2;
+      lens1.position.set(0.44, 0.10, 1.80);
+      boat.add(lens1);
+
+      // Navigation lights on gunwales
+      const portLight = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+      portLight.position.set(-0.95, 0.0, 0.65);
+      boat.add(portLight);
+
+      const stbLight = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+      stbLight.position.set(0.95, 0.0, 0.65);
+      boat.add(stbLight);
+
+      // Rig Label Badge Sprite
+      const c = document.createElement('canvas');
+      c.width = 240;
+      c.height = 46;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'rgba(5, 10, 20, 0.90)';
+      if (ctx.roundRect) ctx.roundRect(0, 0, 240, 46, 8);
+      else ctx.rect(0, 0, 240, 46);
+      ctx.fill();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 15px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('WASS RIG (B=0.88m)', 120, 23);
+      const tex = new THREE.CanvasTexture(c);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.92 }));
+      sp.scale.set(1.4, 0.28, 1.0);
+      sp.position.set(0, 0.0, 1.96);
+      boat.add(sp);
+
+      return boat;
+    }
+
+    function getSeaElevationAt(x, y) {
+      if (!posAttr) return 0;
+      const xMin = -25.0, xMax = 15.0;
+      const yMin = 2.5, yMax = 50.0;
+      if (x < xMin || x > xMax || y < yMin || y > yMax) return null;
+
+      const colF = ((x - xMin) / (xMax - xMin)) * (gridW - 1);
+      const rowF = ((y - yMin) / (yMax - yMin)) * (gridH - 1);
+
+      const c0 = Math.max(0, Math.min(gridW - 1, Math.floor(colF)));
+      const c1 = Math.max(0, Math.min(gridW - 1, c0 + 1));
+      const r0 = Math.max(0, Math.min(gridH - 1, Math.floor(rowF)));
+      const r1 = Math.max(0, Math.min(gridH - 1, r0 + 1));
+
+      const fc = colF - c0;
+      const fr = rowF - r0;
+
+      const pos = posAttr.array;
+      const z00 = pos[(r0 * gridW + c0) * 3 + 2];
+      const z10 = pos[(r0 * gridW + c1) * 3 + 2];
+      const z01 = pos[(r1 * gridW + c0) * 3 + 2];
+      const z11 = pos[(r1 * gridW + c1) * 3 + 2];
+
+      const zTop = z00 * (1 - fc) + z10 * fc;
+      const zBot = z01 * (1 - fc) + z11 * fc;
+      return zTop * (1 - fr) + zBot * fr;
+    }
+
+    function updateRangeArcsOnSeaSurface() {
+      if (!rangeArcsGroup || !rangeArcObjects || !rangeArcObjects.length || !posAttr) return;
+
+      const xMin = -24.8, xMax = 14.8;
+      const yMin = 2.5, yMax = 49.8;
+      const maxArcSegs = 180;
+      const halfW = 0.085; // 17cm physical width radar ribbon
+
+      for (let k = 0; k < rangeArcObjects.length; k++) {
+        const item = rangeArcObjects[k];
+        const r = item.radius;
+        const pos = item.posAttr.array;
+        let segCount = 0;
+
+        for (let deg = -80; deg <= 80; deg += 1.0) {
+          const rad = (deg * Math.PI) / 180;
+          const sinA = Math.sin(rad);
+          const cosA = Math.cos(rad);
+
+          // Center coordinate
+          const xc = r * sinA;
+          const yc = r * cosA;
+
+          if (xc >= xMin && xc <= xMax && yc >= yMin && yc <= yMax) {
+            const zc = getSeaElevationAt(xc, yc);
+            if (zc !== null && !isNaN(zc)) {
+              if (segCount <= maxArcSegs) {
+                // Inner and outer ribbon edge coordinates
+                const xin = (r - halfW) * sinA;
+                const yin = (r - halfW) * cosA;
+                const xout = (r + halfW) * sinA;
+                const yout = (r + halfW) * cosA;
+
+                const vi = segCount * 6;
+                // Inner vertex
+                pos[vi] = xin;
+                pos[vi + 1] = yin;
+                pos[vi + 2] = zc + 0.15; // 15cm draping above sea
+                // Outer vertex
+                pos[vi + 3] = xout;
+                pos[vi + 4] = yout;
+                pos[vi + 5] = zc + 0.15;
+
+                segCount++;
+              }
+            }
+          }
+        }
+
+        item.posAttr.needsUpdate = true;
+        const triangleIndexCount = Math.max(0, (segCount - 1) * 6);
+        item.geom.setDrawRange(0, triangleIndexCount);
+
+        // Stagger labels:
+        // 5m label at -22 deg azimuth (beside boat bow, avoiding rig badge)
+        // 10m, 20m, 30m, 40m, 50m at +14 deg azimuth
+        // 15m, 25m, 35m, 45m at -14 deg azimuth
+        const lblAzimuthDeg = (r === 5) ? -22.0 : ((r % 10 === 0) ? 14.0 : -14.0);
+        const lblRad = (lblAzimuthDeg * Math.PI) / 180;
+        let lblX = r * Math.sin(lblRad);
+        let lblY = r * Math.cos(lblRad);
+        lblX = Math.max(xMin + 1.0, Math.min(xMax - 1.0, lblX));
+        lblY = Math.max(yMin + 0.5, Math.min(yMax - 0.5, lblY));
+        let lblZ = getSeaElevationAt(lblX, lblY);
+        if (lblZ === null || isNaN(lblZ)) lblZ = 0;
+        item.label.position.set(lblX, lblY, lblZ + 0.55);
+        item.label.visible = (segCount > 4);
+      }
+    }
+
+    function resetCamera() {
+      camera.position.set(0, -6.5, 6.0);
+      camera.lookAt(0, 16, 0);
+      controls.target.set(0, 16, 0);
+      controls.update();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (controls) controls.update();
+      if (renderer && scene && camera) renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      container = document.getElementById('canvasContainer');
+      if (camera && renderer && container) {
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        }
+      }
+    });
+
+    function setStreamMode(m) {
+      currentStreamMode = m;
+      document.getElementById('btnStreamDual').classList.toggle('active', m === 'dual');
+      document.getElementById('btnStreamLeft').classList.toggle('active', m === 'left');
+      document.getElementById('btnStreamRight').classList.toggle('active', m === 'right');
+
+      const dualCont = document.getElementById('dualStreamContainer');
+      const singleCont = document.getElementById('singleStreamContainer');
+      const badge = document.getElementById('streamModeBadge');
+
+      if (m === 'dual') {
+        dualCont.classList.remove('d-none');
+        dualCont.classList.add('d-flex');
+        singleCont.classList.add('d-none');
+        badge.innerText = 'Dual Stereo (SBS)';
+      } else {
+        dualCont.classList.add('d-none');
+        dualCont.classList.remove('d-flex');
+        singleCont.classList.remove('d-none');
+        if (m === 'left') {
+          badge.innerText = 'Cam 0 Left (GX010077)';
+          document.getElementById('camTagBadge').innerText = 'GoPro Cam 0 (GX010077)';
+        } else if (m === 'right') {
+          badge.innerText = 'Cam 1 Right (GX011273)';
+          document.getElementById('camTagBadge').innerText = 'GoPro Cam 1 (GX011273)';
+        }
+        updateSingleStreamSource(currentFrame);
+      }
+    }
+
+    function updateSingleStreamSource(idx) {
+      if (currentStreamMode === 'dual') return;
+      const padIdx = String(idx).padStart(3, '0');
+      const singleImg = document.getElementById('liveVideoPlayerSingle');
+      if (currentStreamMode === 'left') {
+        singleImg.src = `/workspace/sequence/video_frame_left_${padIdx}.jpg?t=v3`;
+      } else if (currentStreamMode === 'right') {
+        singleImg.src = `/workspace/sequence/video_frame_right_${padIdx}.jpg?t=v3`;
+      }
+    }
+
+    async function loadFrame(idx) {
+      if (mode !== 'sequence') return;
+      if (idx < 0) idx = 0;
+      if (idx >= totalFrames) idx = totalFrames - 1;
+      currentFrame = idx;
+
+      // Update UI elements synchronously
+      const slider = document.getElementById('timelineSlider');
+      if (slider) slider.value = idx;
+      const badge = document.getElementById('frameCounterBadge');
+      if (badge) badge.innerText = `Frame ${String(idx).padStart(2, '0')} / ${String(totalFrames - 1).padStart(2, '0')}`;
+      
+      const padIdx = String(idx).padStart(3, '0');
+      const leftPlayer = document.getElementById('liveVideoPlayerLeft');
+      if (leftPlayer) leftPlayer.src = `/workspace/sequence/video_frame_left_${padIdx}.jpg`;
+      const rightPlayer = document.getElementById('liveVideoPlayerRight');
+      if (rightPlayer) rightPlayer.src = `/workspace/sequence/video_frame_right_${padIdx}.jpg`;
+      updateSingleStreamSource(idx);
+      const dispPlayer = document.getElementById('liveDispPlayer');
+      if (dispPlayer) dispPlayer.src = `/workspace/sequence/disparity_${padIdx}.png`;
+
+      // Render 3D points immediately if cached in RAM
+      if (frameCache[idx] && frameCache[idx].points) {
+        renderMesh(frameCache[idx].points);
+      } else {
+        try {
+          const controller = new AbortController();
+          const tId = setTimeout(() => controller.abort(), 400);
+          const res = await fetch(`/api/sequence/frame/${idx}`, { signal: controller.signal });
+          clearTimeout(tId);
+          if (res.ok) {
+            frameCache[idx] = await res.json();
+            if (frameCache[idx] && frameCache[idx].points) {
+              renderMesh(frameCache[idx].points);
+            }
+          }
+        } catch (e) {
+          // Continue smoothly
+        }
+      }
+
+      // Synchronously update wave analysis metrics & histogram for this frame
+      fetchWaveAnalysis('frame_' + idx);
+
+      // Asynchronously pre-fetch upcoming frames into RAM cache
+      prefetchNextFrames(idx, 6);
+    }
+
+    function prefetchNextFrames(startIdx, count) {
+      for (let i = 1; i <= count; i++) {
+        const f = (startIdx + i) % totalFrames;
+        if (!frameCache[f]) {
+          fetch(`/api/sequence/frame/${f}`).then(r => r.ok ? r.json() : null).then(d => {
+            if (d && d.points) frameCache[f] = d;
+          }).catch(()=>{});
+        }
+        if (!analysisCache['frame_' + f]) {
+          fetch(`/api/wave_analysis/frame_${f}`).then(r => r.ok ? r.json() : null).then(d => {
+            if (d) analysisCache['frame_' + f] = d;
+          }).catch(()=>{});
+        }
+      }
+    }
+
+    function setRenderMode(m) {
+      renderMode = m;
+      document.getElementById('btnModeSurface').classList.toggle('active', m === 'surface');
+      document.getElementById('btnModeWireframe').classList.toggle('active', m === 'wireframe');
+      document.getElementById('btnModePoints').classList.toggle('active', m === 'points');
+
+      if (seaMesh && seaPoints) {
+        if (m === 'points') {
+          seaMesh.visible = false;
+          seaPoints.visible = true;
+        } else if (m === 'wireframe') {
+          seaMesh.material = seaWireMaterial;
+          seaMesh.visible = true;
+          seaPoints.visible = false;
+        } else {
+          seaMesh.material = seaMeshMaterial;
+          seaMesh.visible = true;
+          seaPoints.visible = false;
+        }
+      }
+      if (currentRawPts) renderMesh(currentRawPts, false);
+    }
+
+    function renderMesh(pts, fitCamera = false) {
+      currentRawPts = pts;
+      document.getElementById('pointCountBadge').innerText = `${pts.length.toLocaleString()} Vertices`;
+
+      // High-performance in-place buffer update for 100x70 grid (0.1ms, zero allocations)
+      if (pts.length === totalGridPoints && posAttr && colAttr && seaGeometry) {
+        // Clean up any static pointcloud object if present
+        if (current3DObject) {
+          scene.remove(current3DObject);
+          if (current3DObject.geometry) current3DObject.geometry.dispose();
+          current3DObject = null;
+        }
+        if (seaMesh) seaMesh.visible = (renderMode !== 'points');
+        if (seaPoints) seaPoints.visible = (renderMode === 'points');
+
+        const pos = posAttr.array;
+        const col = colAttr.array;
+
+        let minZ = Infinity, maxZ = -Infinity;
+        for (let i = 0; i < totalGridPoints; i++) {
+          const z = pts[i][2];
+          if (z < minZ) minZ = z;
+          if (z > maxZ) maxZ = z;
+        }
+        const rangeZ = (maxZ - minZ) || 1;
+
+        for (let i = 0; i < totalGridPoints; i++) {
+          const i3 = i * 3;
+          pos[i3]     = pts[i][0];
+          pos[i3 + 1] = pts[i][1];
+          pos[i3 + 2] = pts[i][2];
+
+          const t = Math.max(0, Math.min(1, (pts[i][2] - minZ) / rangeZ));
+          // Direct RGB interpolation: Deep Navy (#03172e) -> Teal (#025275) -> Azure (#0284c7) -> Soft Seafoam (#38bdf8, no blinding white)
+          if (t < 0.35) {
+            const f = t / 0.35;
+            col[i3]     = 0.015 * (1 - f) + 0.01 * f;
+            col[i3 + 1] = 0.08  * (1 - f) + 0.32 * f;
+            col[i3 + 2] = 0.18  * (1 - f) + 0.46 * f;
+          } else if (t < 0.80) {
+            const f = (t - 0.35) / 0.45;
+            col[i3]     = 0.01  * (1 - f) + 0.02 * f;
+            col[i3 + 1] = 0.32  * (1 - f) + 0.54 * f;
+            col[i3 + 2] = 0.46  * (1 - f) + 0.76 * f;
+          } else {
+            const f = (t - 0.80) / 0.20;
+            col[i3]     = 0.02  * (1 - f) + 0.22 * f;
+            col[i3 + 1] = 0.54  * (1 - f) + 0.74 * f;
+            col[i3 + 2] = 0.76  * (1 - f) + 0.88 * f;
+          }
+        }
+
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+        seaGeometry.computeVertexNormals();
+        seaGeometry.computeBoundingSphere();
+        updateRangeArcsOnSeaSurface();
+        return;
+      }
+
+      // Fallback for irregular static pointclouds (e.g. 350k benchmark points)
+      if (seaMesh) seaMesh.visible = false;
+      if (seaPoints) seaPoints.visible = false;
+
+      if (current3DObject) {
+        scene.remove(current3DObject);
+        if (current3DObject.geometry) current3DObject.geometry.dispose();
+        current3DObject = null;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      const positions = [];
+      const colors = [];
+
+      let minZ = Infinity, maxZ = -Infinity;
+      pts.forEach(p => {
+        if (p[2] < minZ) minZ = p[2];
+        if (p[2] > maxZ) maxZ = p[2];
+      });
+      const rangeZ = (maxZ - minZ) || 1;
+
+      pts.forEach(p => {
+        positions.push(p[0], p[1], p[2]);
+        const t = Math.max(0, Math.min(1, (p[2] - minZ) / rangeZ));
+        let r, g, b;
+        if (t < 0.4) {
+          const f = t / 0.4;
+          r = 0.02 * (1 - f) + 0.01 * f;
+          g = 0.08 * (1 - f) + 0.32 * f;
+          b = 0.20 * (1 - f) + 0.46 * f;
+        } else if (t < 0.8) {
+          const f = (t - 0.4) / 0.4;
+          r = 0.01 * (1 - f) + 0.02 * f;
+          g = 0.32 * (1 - f) + 0.54 * f;
+          b = 0.46 * (1 - f) + 0.76 * f;
+        } else {
+          const f = (t - 0.8) / 0.2;
+          r = 0.02 * (1 - f) + 0.22 * f;
+          g = 0.54 * (1 - f) + 0.74 * f;
+          b = 0.76 * (1 - f) + 0.88 * f;
+        }
+        colors.push(r, g, b);
+      });
+
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+      const mat = new THREE.PointsMaterial({ size: 0.16, vertexColors: true, sizeAttenuation: true });
+      current3DObject = new THREE.Points(geometry, mat);
+      scene.add(current3DObject);
+    }
+
+    // Controlled, non-blocking asynchronous playback loop with watchdog recovery
+    async function playTick() {
+      if (!isPlaying) return;
+      
+      // Watchdog: If frame load took > 350ms, auto-recover to prevent freezing
+      if (isFrameLoading) {
+        if (Date.now() - lastFrameLoadingStart > 350) {
+          isFrameLoading = false;
+        } else {
+          playbackTimeout = setTimeout(playTick, 20);
+          return;
+        }
+      }
+
+      isFrameLoading = true;
+      lastFrameLoadingStart = Date.now();
+      let next = currentFrame + 1;
+      if (next >= totalFrames) next = 0;
+
+      try {
+        await loadFrame(next);
+      } catch (e) {
+        console.warn("Playback frame transition note:", e);
+      } finally {
+        isFrameLoading = false;
+      }
+
+      if (isPlaying) {
+        if (playbackTimeout) clearTimeout(playbackTimeout);
+        playbackTimeout = setTimeout(playTick, playbackSpeed);
+      }
+    }
+
+    function togglePlayback() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (playbackTimeout) {
+        clearTimeout(playbackTimeout);
+        playbackTimeout = null;
+      }
+      if (isPlaying) {
+        btn.innerHTML = '<i class="fa-solid fa-pause me-1"></i> Pause';
+        btn.className = 'btn btn-outline-warning px-3';
+        playTick();
+      } else {
+        btn.innerHTML = '<i class="fa-solid fa-play me-1"></i> Play';
+        btn.className = 'btn btn-action-primary px-3';
+      }
+    }
+
+    function stepFrame(dir) {
+      if (isPlaying) togglePlayback();
+      let next = currentFrame + dir;
+      if (next < 0) next = totalFrames - 1;
+      if (next >= totalFrames) next = 0;
+      loadFrame(next);
+    }
+
+    function onScrub(val) {
+      if (isPlaying) togglePlayback();
+      loadFrame(parseInt(val));
+    }
+
+    function changeSpeed() {
+      const fps = parseInt(document.getElementById('fpsSelect').value);
+      playbackSpeed = Math.round(1000 / fps);
+    }
+
+    // Bulk preloading pipeline: downloads all telemetry and points in 2 fast requests, then images
+    async function preloadBulkData() {
+      try {
+        const resA = await fetch('/api/sequence/all_analysis');
+        if (resA.ok) {
+          const allA = await resA.json();
+          Object.assign(analysisCache, allA);
+          if (analysisCache['frame_' + currentFrame]) {
+            applyAnalysisData(analysisCache['frame_' + currentFrame]);
+          }
+        }
+      } catch (e) {
+        console.warn('Preload analysis note:', e);
+      }
+
+      try {
+        const resP = await fetch('/api/sequence/all_points');
+        if (resP.ok) {
+          const allP = await resP.json();
+          for (const [k, pts] of Object.entries(allP)) {
+            frameCache[parseInt(k)] = { points: pts };
+          }
+          if (frameCache[currentFrame] && frameCache[currentFrame].points) {
+            renderMesh(frameCache[currentFrame].points);
+          }
+        }
+      } catch (e) {
+        console.warn('Preload points note:', e);
+      }
+
+      // Staged, non-blocking prefetch of the first upcoming window (avoids HTTP/1.1 socket starvation)
+      prefetchNextFrames(0, 6);
+    }
+
+    async function onDatasetChange() {
+      const val = document.getElementById('datasetSelector').value;
+      if (val === 'sequence') {
+        mode = 'sequence';
+        document.getElementById('timelineSlider').disabled = false;
+        document.getElementById('playBtn').disabled = false;
+        document.getElementById('streamModeGroup').classList.remove('d-none');
+        setStreamMode(currentStreamMode);
+        if (current3DObject) {
+          scene.remove(current3DObject);
+          if (current3DObject.geometry) current3DObject.geometry.dispose();
+          current3DObject = null;
+        }
+        if (seaMesh) seaMesh.visible = (renderMode !== 'points');
+        if (seaPoints) seaPoints.visible = (renderMode === 'points');
+        loadFrame(0);
+      } else {
+        mode = 'static';
+        if (isPlaying) togglePlayback();
+        document.getElementById('timelineSlider').disabled = true;
+        document.getElementById('playBtn').disabled = true;
+        document.getElementById('streamModeGroup').classList.add('d-none');
+        document.getElementById('dualStreamContainer').classList.add('d-none');
+        document.getElementById('dualStreamContainer').classList.remove('d-flex');
+        document.getElementById('singleStreamContainer').classList.remove('d-none');
+        document.getElementById('loading3D').classList.remove('d-none');
+        try {
+          const res = await fetch(`/api/pointcloud/${val}`);
+          const data = await res.json();
+          if (data.points) {
+            renderMesh(data.points, true);
+          }
+          document.getElementById('liveDispPlayer').src = `/workspace/output/${val}/disparity_final_scaled.png?t=` + new Date().getTime();
+          document.getElementById('liveVideoPlayerSingle').src = `/workspace/output/${val}/video.jpg?t=` + new Date().getTime();
+          document.getElementById('frameCounterBadge').innerText = val;
+          document.getElementById('camTagBadge').innerText = val;
+          fetchWaveAnalysis(val);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          document.getElementById('loading3D').classList.add('d-none');
+        }
+      }
+    }
+
+    async function fetchWaveAnalysis(target) {
+      const badge = document.getElementById('analysisTargetBadge');
+      if (target.startsWith('frame_')) {
+        const frameNum = parseInt(target.replace('frame_', ''));
+        badge.innerText = `Frame ${String(frameNum).padStart(2, '0')}`;
+      } else {
+        badge.innerText = target;
+      }
+      document.getElementById('btnDownloadCsv').href = `/api/wave_analysis/export/${target}`;
+
+      if (analysisCache[target]) {
+        applyAnalysisData(analysisCache[target]);
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/wave_analysis/${target}`);
+        if (res.ok) {
+          const data = await res.json();
+          analysisCache[target] = data;
+          applyAnalysisData(data);
+        }
+      } catch (e) {
+        console.warn("Wave analysis fetch note:", e);
+      }
+    }
+
+    function applyAnalysisData(data) {
+      if (!data) return;
+
+      const obsHeight = (data.observer_height_m !== undefined ? data.observer_height_m : 4.75);
+      document.getElementById('statObsHeight').innerText = obsHeight.toFixed(2) + ' m';
+      
+      const hs = (data.significant_wave_height_Hs_m !== undefined ? data.significant_wave_height_Hs_m : 0);
+      document.getElementById('statHs').innerText = hs.toFixed(2) + ' m';
+      
+      if (data.distance) {
+        document.getElementById('statDistRange').innerText = `${(data.distance.min_m || 0).toFixed(1)} - ${(data.distance.max_m || 0).toFixed(1)} m`;
+        document.getElementById('statDistMean').innerText = `Mean: ${(data.distance.mean_m || 0).toFixed(1)} m (Med: ${(data.distance.median_m || 0).toFixed(1)} m)`;
+      }
+      
+      const crest = (data.peak_crest_m !== undefined ? data.peak_crest_m : 0);
+      const trough = (data.deepest_trough_m !== undefined ? data.deepest_trough_m : 0);
+      document.getElementById('statCrestTrough').innerText = `+${crest.toFixed(2)}m / ${trough.toFixed(2)}m`;
+
+      const tbody = document.getElementById('tbodyDistanceProfile');
+      const arcs = (data.circular_arcs_5m && data.circular_arcs_5m.length > 0) ? data.circular_arcs_5m : data.distance_profile;
+      if (arcs && arcs.length > 0) {
+        let html = '';
+        arcs.forEach(z => {
+          const meanElev = (z.mean_elevation_m !== undefined ? z.mean_elevation_m : 0);
+          const sign = meanElev >= 0 ? '+' : '';
+          const crestVal = (z.crest_m !== undefined ? z.crest_m : 0);
+          const troughVal = (z.trough_m !== undefined ? z.trough_m : 0);
+          const hsVal = (z.Hs_m !== undefined ? z.Hs_m : (z.significant_height_Hs_m !== undefined ? z.significant_height_Hs_m : (z.significant_height_m !== undefined ? z.significant_height_m : 0)));
+          const ampVal = (z.amplitude_m !== undefined ? z.amplitude_m : Math.max(0, crestVal - troughVal));
+          const radLabel = (z.radius_m !== undefined) ? `${z.radius_m.toFixed(0)}m` : ((z.center_dist_m !== undefined) ? `${z.center_dist_m.toFixed(0)}m` : '--');
+          const bandLabel = z.band_m || z.range_m || '--';
+          const count = (z.point_count !== undefined ? z.point_count : 0);
+
+          html += `<tr>
+            <td><span class="badge bg-dark border border-info text-info font-monospace py-0 px-1" style="font-size: 0.64rem;">${radLabel}</span></td>
+            <td style="font-size: 0.65rem; color: #cbd5e1 !important;" class="font-monospace">${bandLabel}</td>
+            <td class="font-monospace" style="font-size: 0.66rem;">${count.toLocaleString()}</td>
+            <td class="font-monospace" style="font-size: 0.66rem;">${sign}${meanElev.toFixed(2)}m</td>
+            <td class="text-info fw-bold font-monospace" style="font-size: 0.66rem;">+${crestVal.toFixed(2)}m</td>
+            <td class="text-warning font-monospace" style="font-size: 0.66rem;">${troughVal.toFixed(2)}m</td>
+            <td class="text-light fw-bold font-monospace" style="font-size: 0.66rem;">${ampVal.toFixed(2)}m</td>
+            <td class="text-primary fw-bold font-monospace" style="font-size: 0.66rem;">${hsVal.toFixed(2)}m</td>
+          </tr>`;
+        });
+        tbody.innerHTML = html;
+      }
+
+      if (data.elevation_distribution && data.elevation_distribution.counts) {
+        drawHistogram(data.elevation_distribution);
+      } else if (data.elevation_histogram && data.elevation_histogram.densities) {
+        const hist = data.elevation_histogram;
+        const fakeEdges = hist.bin_centers.map((c, i) => c - 0.05);
+        fakeEdges.push(hist.bin_centers[hist.bin_centers.length - 1] + 0.05);
+        drawHistogram({
+          counts: hist.densities.map(d => Math.round(d * 1000)),
+          bin_edges_m: fakeEdges
+        });
+      }
+    }
+
+    function toggleRangeArcs() {
+      rangeArcsVisible = !rangeArcsVisible;
+      if (rangeArcsGroup) rangeArcsGroup.visible = rangeArcsVisible;
+      const btn = document.getElementById('btnToggleRangeArcs');
+      if (btn) {
+        btn.classList.toggle('active', rangeArcsVisible);
+        btn.innerHTML = rangeArcsVisible ? '<i class="fa-solid fa-bullseye me-1 text-info"></i> 5m Arcs' : '<i class="fa-solid fa-bullseye me-1 text-muted"></i> 5m Arcs (OFF)';
+      }
+    }
+
+    function exportCurrentArcsCsv() {
+      const idx = currentFrame || 0;
+      window.open('/api/wave_analysis/export_arcs/sequence_' + String(idx).padStart(3, '0'), '_blank');
+    }
+
+    function drawHistogram(dist) {
+      const canvas = document.getElementById('elevationHistCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const targetW = Math.round(canvas.clientWidth * dpr);
+      const targetH = Math.round(canvas.clientHeight * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const counts = dist.counts || [];
+      const binEdges = dist.bin_edges_m || [];
+      const nBins = counts.length;
+      if (nBins === 0) return;
+      const maxCount = Math.max(...counts, 1);
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Grid lines
+      ctx.strokeStyle = '#1e2433';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 3; i++) {
+        const y = h * (i / 4);
+        ctx.beginPath();
+        ctx.moveTo(35, y);
+        ctx.lineTo(w - 10, y);
+        ctx.stroke();
+      }
+
+      const barWidth = (w - 55) / nBins;
+      const bottom = h - 22;
+
+      for (let i = 0; i < nBins; i++) {
+        const val = counts[i];
+        const barHeight = (val / maxCount) * (bottom - 15);
+        const x = 40 + i * barWidth;
+        const y = bottom - barHeight;
+
+        let binCenter = 0;
+        if (binEdges.length > i + 1) {
+          binCenter = (binEdges[i] + binEdges[i + 1]) / 2;
+        } else if (binEdges.length > i) {
+          binCenter = binEdges[i];
+        }
+
+        if (binCenter < -0.3) {
+          ctx.fillStyle = '#0284c7';
+        } else if (binCenter < 0.3) {
+          ctx.fillStyle = '#10b981';
+        } else {
+          ctx.fillStyle = '#f59e0b';
+        }
+
+        ctx.fillRect(x + 1, y, Math.max(1, barWidth - 2), barHeight);
+      }
+
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(38, bottom);
+      ctx.lineTo(w - 10, bottom);
+      ctx.stroke();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.fillText(maxCount.toLocaleString(), 5, 14);
+      ctx.fillText('0', 20, bottom);
+
+      if (binEdges.length > 0) {
+        const minEdge = binEdges[0];
+        const maxEdge = binEdges[binEdges.length - 1];
+        document.getElementById('labelMinTrough').innerText = (minEdge !== undefined ? minEdge.toFixed(2) : '-1.5') + 'm';
+        document.getElementById('labelMaxCrest').innerText = '+' + (maxEdge !== undefined ? maxEdge.toFixed(2) : '1.5') + 'm';
+      }
+    }
+
+    function showTab(t) {
+      const isPlayer = (t === 'player');
+      const tabPlayer = document.getElementById('tabPlayer');
+      const tabProcessor = document.getElementById('tabProcessor');
+      const btnPlayer = document.getElementById('tabPlayerBtn');
+      const btnProcessor = document.getElementById('tabProcessorBtn');
+
+      if (isPlayer) {
+        tabPlayer.classList.add('active');
+        tabProcessor.classList.remove('active');
+        btnPlayer.classList.add('active');
+        btnProcessor.classList.remove('active');
+        if (renderer && container && camera) {
+          camera.aspect = container.clientWidth / container.clientHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        loadMeta();
+      } else {
+        tabPlayer.classList.remove('active');
+        tabProcessor.classList.add('active');
+        btnPlayer.classList.remove('active');
+        btnProcessor.classList.add('active');
+      }
+    }
+
+    function switchToProcessorTab() {
+      showTab('processor');
+    }
+
+    function openRenderedInStudio() {
+      showTab('player');
+      frameCache = {};
+      analysisCache = {};
+      loadMeta().then(() => {
+        loadFrame(0);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('tab') === 'processor' || window.location.hash.toLowerCase().includes('processor')) {
+        showTab('processor');
+      } else {
+        showTab('player');
+      }
+
+      window.addEventListener('hashchange', () => {
+        if (window.location.hash.toLowerCase().includes('processor')) {
+          showTab('processor');
+        } else {
+          showTab('player');
+        }
+      });
+    });
+
+    function toggleSourceInputs() {
+      const src = document.getElementById('videoSource').value;
+      document.getElementById('dualInputs').classList.toggle('d-none', src !== 'dual');
+      document.getElementById('sbsInputs').classList.toggle('d-none', src !== 'sbs');
+    }
+
+    async function startPipeline() {
+      const form = new FormData();
+      const source = document.getElementById('videoSource').value;
+      form.append('video_source', source);
+      form.append('max_frames', document.getElementById('maxFrames').value);
+      form.append('step', document.getElementById('frameStep').value);
+      form.append('reconstruct_mode', document.getElementById('reconstructQuality').value);
+
+      if (source === 'dual') {
+        const c0 = document.getElementById('cam0File').files[0];
+        const c1 = document.getElementById('cam1File').files[0];
+        if (!c0 || !c1) return alert('Please select both Cam0 and Cam1 video files.');
+        form.append('cam0_file', c0);
+        form.append('cam1_file', c1);
+      } else if (source === 'sbs') {
+        const sbs = document.getElementById('sbsFile').files[0];
+        if (!sbs) return alert('Please select a side-by-side stereo video file.');
+        form.append('sbs_file', sbs);
+      }
+
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('completionBanner').classList.add('d-none');
+      document.getElementById('systemStateBadge').innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1 text-warning"></i> Processing Pipeline';
+      document.getElementById('stageBadge').innerText = 'Initializing...';
+
+      try {
+        const res = await fetch('/api/run', { method: 'POST', body: form });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error || 'Pipeline start failed');
+          document.getElementById('startBtn').disabled = false;
+          return;
+        }
+        pollStatus();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('startBtn').disabled = false;
+      }
+    }
+
+    let pollInterval = null;
+    function pollStatus() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/status');
+          const state = await res.json();
+
+          document.getElementById('progressBar').style.width = state.progress + '%';
+          document.getElementById('progressBar').innerText = state.progress + '%';
+          document.getElementById('stageBadge').innerText = state.current_stage || state.status;
+
+          const consoleElem = document.getElementById('logConsole');
+          if (state.logs && state.logs.length > 0) {
+            consoleElem.innerHTML = state.logs.join('<br>');
+            consoleElem.scrollTop = consoleElem.scrollHeight;
+          }
+
+          if (state.status === 'completed') {
+            clearInterval(pollInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('systemStateBadge').innerHTML = '<i class="fa-solid fa-check text-success me-1"></i> Completed';
+            document.getElementById('stageBadge').innerText = 'Completed';
+            document.getElementById('completionBanner').classList.remove('d-none');
+            document.getElementById('completionText').innerText = `Reconstruction Complete: Processed ${document.getElementById('maxFrames').value} frames into 3D meshes & wave telemetry.`;
+            
+            // Invalidate caches and reload sequence bounds dynamically
+            frameCache = {};
+            analysisCache = {};
+            loadMeta().then(() => {
+              loadFrame(0);
+            });
+          } else if (state.status === 'error') {
+            clearInterval(pollInterval);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('systemStateBadge').innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Error';
+            document.getElementById('stageBadge').innerText = 'Error';
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 500);
+    }
+
+    async function loadMeta() {
+      try {
+        const res = await fetch('/api/sequence/meta?t=' + Date.now());
+        if (res.ok) {
+          const meta = await res.json();
+          if (meta.total_frames) {
+            totalFrames = meta.total_frames;
+            const slider = document.getElementById('timelineSlider');
+            if (slider) slider.max = totalFrames - 1;
+            const maxLabel = document.getElementById('maxFrameLabel');
+            if (maxLabel) maxLabel.innerText = totalFrames - 1;
+            const opt = document.querySelector('#datasetSelector option[value="sequence"]');
+            if (opt) opt.innerText = `Continuous Playback Stream (${totalFrames} Synchronized Frames)`;
+            const activeBadge = document.getElementById('framesActiveBadge');
+            if (activeBadge) activeBadge.innerHTML = `<i class="fa-solid fa-bolt me-1"></i> ${totalFrames} Frames Active`;
+            const frameBadge = document.getElementById('frameCounterBadge');
+            if (frameBadge && mode === 'sequence') frameBadge.innerText = `Frame ${String(currentFrame).padStart(2, '0')} / ${String(totalFrames - 1).padStart(2, '0')}`;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      preloadBulkData();
+    }
+
+    loadMeta().then(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const frameParam = urlParams.get('frame');
+      const startFrame = (frameParam !== null && !isNaN(parseInt(frameParam))) ? parseInt(frameParam) : 0;
+      loadFrame(startFrame);
+    });
+    init3D();
+  </script>
+  <!-- Bootstrap JS -->
+  <script src="/static/vendor/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
