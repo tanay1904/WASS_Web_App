@@ -1,6 +1,6 @@
 # WASS - 3D Ocean Wave Stereophotogrammetry Studio
 
-[![CI Validation](https://img.shields.io/badge/CI--Validation-12%2F12%20Passing-brightgreen.svg)](tests/)
+[![CI Validation](https://img.shields.io/badge/CI--Validation-28%2F28%20Passing-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Codespaces Ready](https://img.shields.io/badge/Codespaces-Ready-brightgreen.svg)](https://github.com/features/codespaces)
@@ -377,24 +377,141 @@ python regenerate_5m_arcs.py
 
 ## 9. Running the Automated Test Suite
 
-Run the full automated test suite covering physical stereo mathematics, vessel geometry, 5m circular range rings, and FastAPI endpoints:
+Run the full automated test suite covering physical stereo mathematics, vessel geometry, 5m circular range rings, adversarial edge cases, security path traversal, and FastAPI endpoints:
 
 ```bash
-# Run all 12 unit and integration tests
-python -m pytest tests/ -v
+# Run all 28 unit, integration, and security resilience tests
+python -m pytest -v
 
 # Run physical stereo math and 5m radar arc geometry tests only
 python -m pytest tests/test_wave_math.py -v
 
 # Run FastAPI endpoint, sequence, and RFC 4180 CSV export tests only
 python -m pytest tests/test_api_endpoints.py -v
+
+# Run adversarial math fuzzing (SVD memory bounds, NaNs, Infs, collinearity)
+python -m pytest tests/test_adversarial_math.py -v
+
+# Run security resilience (path traversal, upload sanitization, concurrency locks)
+python -m pytest tests/test_security_resilience.py -v
 ```
 
-All 12 test modules evaluate metric scale formulas, bow clearances, 5m range rings, and API error boundaries.
+All 28 test modules evaluate metric scale formulas, bow clearances, 5m range rings, memory allocation boundaries, path sanitization, and API error handling.
 
 ---
 
-## 10. Complete Python Commands Reference
+## 10. Complete Python Commands & SDK Reference
+
+### 1. Starting the Web Studio & Server
+
+* **Direct Script Launch:**
+  ```bash
+  python wass_webapp/app.py
+  ```
+
+* **Production Uvicorn Server:**
+  ```bash
+  python -m uvicorn wass_webapp.app:app --host 0.0.0.0 --port 8080
+  ```
+
+* **Development Mode (Auto-Reload on Code Changes):**
+  ```bash
+  python -m uvicorn wass_webapp.app:app --host 0.0.0.0 --port 8080 --reload
+  ```
+
+* **One-Liner Backend Health Verification:**
+  ```bash
+  python -c "import urllib.request, json; print(json.loads(urllib.request.urlopen('http://127.0.0.1:8080/api/status').read()))"
+  ```
+
+---
+
+### 2. Terminal Pipeline Execution (Stereo Video Ingestion & Reconstruction)
+
+* **Calibrated Dual-Camera Video Streams (Cam 0 & Cam 1):**
+  ```bash
+  python wass_video_pipeline.py \
+      --video0 path/to/cam0_left.mp4 \
+      --video1 path/to/cam1_right.mp4 \
+      --max-frames 60 \
+      --step 3 \
+      --work-dir ./pipeline_output
+  ```
+
+* **Side-by-Side (SBS) Composite Stereo Video:**
+  ```bash
+  python wass_video_pipeline.py \
+      --video-sbs path/to/stereo_sbs.mp4 \
+      --max-frames 100 \
+      --step 1 \
+      --work-dir ./pipeline_output
+  ```
+
+* **CLI Parameter Options:**
+  * `--max-frames`: Desired frame quantity to reconstruct (`20`, `60`, `100`, `500`, `1000`).
+  * `--step`: Temporal downsampling stride (`1` = 30 FPS, `3` = 10 FPS, `30` = 1 FPS).
+  * `--work-dir`: Destination folder for workspaces, `.xyz` point clouds, and disparity maps.
+
+---
+
+### 3. Batch Telemetry & 5m Radar Arc Regeneration
+
+Recalculates dense disparity fields, regularized 3D sea surfaces, and RFC 4180 CSV tables across the entire active sequence:
+```bash
+python regenerate_5m_arcs.py
+```
+
+---
+
+### 4. Standalone Point Cloud (.xyz) Analysis CLI & Python SDK
+
+* **Command-Line Interface:**
+  ```bash
+  python analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv annotated_points_000.csv
+  ```
+
+* **Python Programmatic Script:**
+  ```python
+  from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+
+  # Ingest 3D point cloud, fit sea plane, and compute 5m concentric radar arcs
+  stats, pts, distances, elevations = analyze_xyz("wass_webapp/workspace/sequence/pointcloud_000.xyz")
+  print(f"Significant Wave Height (Hs): {stats['wave_parameters']['significant_wave_height_Hs_m']} m")
+  print(f"Peak Crest Elevation: {stats['wave_parameters']['crest_elevation_max_m']} m")
+
+  # Export annotated dataset [X, Y, Z, distance, MSL_elevation]
+  export_annotated_xyz(pts, distances, elevations, "annotated_wave_points.csv")
+  ```
+
+---
+
+### 5. Python API Client: Downloading Telemetry & Point Clouds
+
+Programmatic access to live Web Studio telemetry using standard Python packages:
+
+```python
+import requests
+import pandas as pd
+
+BASE_URL = "http://127.0.0.1:8080"
+
+# 1. Download 5m circular radar arcs CSV for Frame 0 (RFC 4180 format)
+csv_url = f"{BASE_URL}/api/wave_analysis/export_arcs/sequence_000"
+df_arcs = pd.read_csv(csv_url)
+print(df_arcs[["arc_radius_m", "range_band", "significant_wave_height_Hs_m", "peak_crest_m"]])
+
+# 2. Retrieve complete 60-frame time series of wave telemetry
+all_analysis = requests.get(f"{BASE_URL}/api/sequence/all_analysis").json()
+print(f"Retrieved wave analysis for {len(all_analysis)} frames")
+
+# 3. Retrieve 7,000 vertices per frame for all 60 frames (420,000 3D ocean vertices)
+all_points = requests.get(f"{BASE_URL}/api/sequence/all_points").json()
+print(f"Retrieved 3D mesh points for {len(all_points)} frames")
+```
+
+---
+
+### 6. Quick Reference Table
 
 | Task | Command | Description |
 | :--- | :--- | :--- |
@@ -405,9 +522,11 @@ All 12 test modules evaluate metric scale formulas, bow clearances, 5m range rin
 | **Run SBS Video Pipeline** | `python wass_video_pipeline.py --video-sbs sbs.mp4 --max-frames 100 --step 1` | Ingests Side-by-Side video |
 | **Batch Regenerate Arcs** | `python regenerate_5m_arcs.py` | Regenerates all 60 frames 5m arcs and CSVs |
 | **Analyze Point Cloud (.xyz)**| `python analyze_wave_xyz.py pointcloud.xyz --export-csv wave_pts.csv` | Analyzes 3D waves & exports CSV |
-| **Run Full Test Suite** | `python -m pytest tests/ -v` | Executes all 12 verification tests |
+| **Run Full Test Suite** | `python -m pytest tests/ -v` | Executes all 28 automated tests |
 | **Run Wave Math Tests** | `python -m pytest tests/test_wave_math.py -v` | Validates metric formulas & bow clearance |
 | **Run API Tests** | `python -m pytest tests/test_api_endpoints.py -v` | Validates endpoints & RFC 4180 CSV |
+| **Run Adversarial Math Tests**| `python -m pytest tests/test_adversarial_math.py -v` | Validates SVD, NaNs, Infs, & distance bins |
+| **Run Security Tests** | `python -m pytest tests/test_security_resilience.py -v` | Validates traversal, uploads, & concurrency |
 | **Install Dependencies** | `pip install -r requirements.txt` | Installs pinned packages |
 
 ---
