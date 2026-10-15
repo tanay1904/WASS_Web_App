@@ -330,13 +330,17 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path):
     Exports point cloud with distance from observer and height from sea level.
     Columns: X, Y, Z, distance_from_observer_m, height_from_sea_level_m
     """
+    out_dir = os.path.dirname(os.path.abspath(out_csv_path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m\n"
+    pts_arr = np.atleast_2d(pts) if (hasattr(pts, 'size') and pts.size > 0) else np.empty((0, 3))
     with open(out_csv_path, "w", encoding="utf-8") as f:
         f.write(header)
-        for i in range(len(pts)):
+        for i in range(len(pts_arr)):
             d_val = dist_observer[i] if i < len(dist_observer) else 0.0
             h_val = height_sea_level[i] if i < len(height_sea_level) else 0.0
-            f.write(f"{pts[i,0]:.4f},{pts[i,1]:.4f},{pts[i,2]:.4f},{d_val:.4f},{h_val:.4f}\n")
+            f.write(f"{pts_arr[i,0]:.4f},{pts_arr[i,1]:.4f},{pts_arr[i,2]:.4f},{d_val:.4f},{h_val:.4f}\n")
     print(f"Exported annotated dataset to {out_csv_path}")
 
 
@@ -349,7 +353,11 @@ if __name__ == "__main__":
     parser.add_argument("--export-csv", type=str, default=None, help="Path to export annotated CSV with distance and MSL height")
     args = parser.parse_args()
 
-    if args.xyz_path and os.path.exists(args.xyz_path):
+    if args.xyz_path is not None:
+        if not os.path.exists(args.xyz_path):
+            parser.error(f"XYZ file not found: {args.xyz_path}")
+        if args.plane and not os.path.exists(args.plane):
+            parser.error(f"Plane file not found: {args.plane}")
         res, pts, dist, h_sea = analyze_xyz(args.xyz_path, args.plane)
         print("Analysis completed successfully:")
         print(json.dumps(res, indent=2))

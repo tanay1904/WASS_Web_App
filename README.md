@@ -1,6 +1,6 @@
 # WASS - 3D Ocean Wave Stereophotogrammetry Studio
 
-[![CI Validation](https://img.shields.io/badge/CI--Validation-28%2F28%20Passing-brightgreen.svg)](tests/)
+[![CI Validation](https://img.shields.io/badge/CI--Validation-33%2F33%20Passing-brightgreen.svg)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Codespaces Ready](https://img.shields.io/badge/Codespaces-Ready-brightgreen.svg)](https://github.com/features/codespaces)
@@ -382,9 +382,12 @@ python -m pytest tests/test_adversarial_math.py -v
 
 # Run security resilience (path traversal, upload sanitization, concurrency locks)
 python -m pytest tests/test_security_resilience.py -v
+
+# Run adversarial backend breaker (ZeroDivisionError, corrupted files, reserved names)
+python -m pytest tests/test_adversarial_backend_breaker.py -v
 ```
 
-All 28 test modules evaluate metric scale formulas, bow clearances, 5m range rings, memory allocation boundaries, path sanitization, and API error handling.
+All 33 test modules evaluate metric scale formulas, bow clearances, 5m range rings, memory allocation boundaries, path sanitization, corrupted file recovery, and API error handling.
 
 ---
 
@@ -509,7 +512,7 @@ print(f"Retrieved 3D mesh points for {len(all_points)} frames")
 | **Run Dual-Video Pipeline** | `python wass_webapp/wass_video_pipeline.py --video0 left.mp4 --video1 right.mp4 --max-frames 60 --step 3` | Ingests stereo video pair |
 | **Run SBS Video Pipeline** | `python wass_webapp/wass_video_pipeline.py --video-sbs sbs.mp4 --max-frames 100 --step 1` | Ingests Side-by-Side video |
 | **Analyze Point Cloud (.xyz)**| `python wass_webapp/analyze_wave_xyz.py wass_webapp/workspace/sequence/pointcloud_000.xyz --export-csv wave_pts.csv` | Analyzes 3D waves & exports CSV |
-| **Run Full Test Suite** | `python -m pytest tests/ -v` | Executes all 28 automated tests |
+| **Run Full Test Suite** | `python -m pytest tests/ -v` | Executes all 33 automated tests |
 | **Run Wave Math Tests** | `python -m pytest tests/test_wave_math.py -v` | Validates metric formulas & bow clearance |
 | **Run API Tests** | `python -m pytest tests/test_api_endpoints.py -v` | Validates endpoints & RFC 4180 CSV |
 | **Run Adversarial Math Tests**| `python -m pytest tests/test_adversarial_math.py -v` | Validates SVD, NaNs, Infs, & distance bins |

@@ -19,6 +19,13 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 SAFE_NAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-]+$')
+MAX_UPLOAD_SIZE = 150 * 1024 * 1024  # 150 MB
+
+WINDOWS_RESERVED_NAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+}
 
 
 def is_safe_identifier(val: str) -> bool:
@@ -27,12 +34,47 @@ def is_safe_identifier(val: str) -> bool:
 
 
 def sanitize_filename(filename: str) -> str:
-    """Sanitize uploaded filenames preventing directory traversal."""
+    """Sanitize uploaded filenames preventing directory traversal, OS injection, and device collisions."""
     if not filename:
         return "unnamed_upload.bin"
     base = Path(filename).name
     safe = re.sub(r'[^a-zA-Z0-9_.-]', '_', base)
-    return safe if safe and safe not in [".", ".."] else "unnamed_upload.bin"
+    safe = safe.strip('. ')
+    if not safe or safe in [".", ".."]:
+        return "unnamed_upload.bin"
+
+    p = Path(safe)
+    if p.stem.upper() in WINDOWS_RESERVED_NAMES:
+        safe = f"safe_{safe}"
+        p = Path(safe)
+
+    ext = p.suffix[:10]
+    stem = p.stem[:54]
+    safe = stem + ext
+    return safe if safe else "unnamed_upload.bin"
+
+
+async def save_upload_file(upload_file: UploadFile, dest_path: str, max_bytes: int = MAX_UPLOAD_SIZE):
+    """Safely stream an uploaded file to disk with strict size bounds."""
+    total_written = 0
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    try:
+        with open(dest_path, "wb") as f:
+            while True:
+                chunk = await upload_file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total_written += len(chunk)
+                if total_written > max_bytes:
+                    raise ValueError(f"Uploaded file exceeds maximum limit of {max_bytes // (1024*1024)}MB")
+                f.write(chunk)
+    except Exception:
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+            except Exception:
+                pass
+        raise
 
 
 pipeline_lock = threading.Lock()
@@ -744,13 +786,16 @@ async def start_pipeline(
             return JSONResponse({"error": "Invalid file upload path"}, status_code=400)
 
         try:
-            with open(v0_path, "wb") as f0, open(v1_path, "wb") as f1:
-                f0.write(await cam0_file.read())
-                f1.write(await cam1_file.read())
+            await save_upload_file(cam0_file, v0_path)
+            await save_upload_file(cam1_file, v1_path)
+        except ValueError as e:
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": str(e)}, status_code=400)
         except Exception as e:
             with pipeline_lock:
-                pipeline_state["status"] = "error"
-            return JSONResponse({"error": f"Failed to save uploaded files: {str(e)}"}, status_code=500)
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": f"Failed to save uploaded files: {str(e)}"}, status_code=400)
 
     elif video_source == "sbs":
         if not sbs_file:
@@ -767,12 +812,15 @@ async def start_pipeline(
             return JSONResponse({"error": "Invalid file upload path"}, status_code=400)
 
         try:
-            with open(sbs_path, "wb") as fs:
-                fs.write(await sbs_file.read())
+            await save_upload_file(sbs_file, sbs_path)
+        except ValueError as e:
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": str(e)}, status_code=400)
         except Exception as e:
             with pipeline_lock:
-                pipeline_state["status"] = "error"
-            return JSONResponse({"error": f"Failed to save uploaded file: {str(e)}"}, status_code=500)
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": f"Failed to save uploaded file: {str(e)}"}, status_code=400)
 
     background_tasks.add_task(
         run_pipeline_worker,
@@ -800,9 +848,13 @@ def get_pointcloud(frame_name: str, max_points: int = 15000):
 
     json_path = os.path.join(target_dir, "points.json")
     if os.path.exists(json_path):
-        with open(json_path, "r") as f:
-            pts = json.load(f)
-        return JSONResponse({"count": len(pts), "points": pts})
+        try:
+            with open(json_path, "r") as f:
+                pts = json.load(f)
+            if isinstance(pts, list):
+                return JSONResponse({"count": len(pts), "points": pts})
+        except Exception:
+            pass
     
     xyz_path = os.path.join(target_dir, "plane_refinement_inliers.xyz")
     if not os.path.exists(xyz_path):
@@ -834,10 +886,15 @@ def _get_active_total_frames():
     if os.path.exists(meta_path):
         try:
             with open(meta_path, "r") as f:
-                return json.load(f).get("total_frames", 60)
+                data = json.load(f)
+                if isinstance(data, dict) and "total_frames" in data:
+                    return max(0, int(data["total_frames"]))
         except Exception:
             pass
-    return 60
+    if os.path.exists(seq_dir):
+        pts_files = glob.glob(os.path.join(seq_dir, "points_*.json"))
+        return len(pts_files)
+    return 0
 
 @app.get("/api/sequence/all_points")
 def get_all_points():
@@ -850,8 +907,13 @@ def get_all_points():
     for idx in range(total_frames):
         pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
         if os.path.exists(pts_file):
-            with open(pts_file, "r") as f:
-                frames[idx] = json.load(f)
+            try:
+                with open(pts_file, "r") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        frames[idx] = data
+            except Exception:
+                continue
     _cached_all_points = frames
     _cached_all_points_bytes = json.dumps(frames).encode("utf-8")
     return Response(content=_cached_all_points_bytes, media_type="application/json")
@@ -868,8 +930,13 @@ def get_all_analysis():
     for idx in range(total_frames):
         a_file = os.path.join(seq_dir, f"wave_analysis_{idx:03d}.json")
         if os.path.exists(a_file):
-            with open(a_file, "r") as f:
-                analyses[f"frame_{idx}"] = json.load(f)
+            try:
+                with open(a_file, "r") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        analyses[f"frame_{idx}"] = data
+            except Exception:
+                continue
     _cached_all_analysis = analyses
     _cached_all_analysis_bytes = json.dumps(analyses).encode("utf-8")
     return Response(content=_cached_all_analysis_bytes, media_type="application/json")
@@ -879,9 +946,15 @@ def get_all_analysis():
 def get_sequence_meta():
     meta_path = os.path.join(WORK_DIR, "sequence", "sequence_meta.json")
     if os.path.exists(meta_path):
-        with open(meta_path, "r") as f:
-            return JSONResponse(json.load(f))
-    return JSONResponse({"total_frames": 0, "fps": 10})
+        try:
+            with open(meta_path, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return JSONResponse(data)
+        except Exception:
+            pass
+    total_frames = _get_active_total_frames()
+    return JSONResponse({"total_frames": total_frames, "fps": 10})
 
 
 @app.get("/api/sequence/frame/{idx}")
@@ -896,8 +969,14 @@ def get_sequence_frame(idx: int):
     pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
     if not os.path.exists(pts_file):
         return JSONResponse({"error": "Frame not found"}, status_code=404)
-    with open(pts_file, "r") as f:
-        pts = json.load(f)
+    try:
+        with open(pts_file, "r") as f:
+            pts = json.load(f)
+        if not isinstance(pts, list):
+            return JSONResponse({"error": "Frame data corrupted: expected list"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to read frame data: {str(e)}"}, status_code=500)
+
     frame_obj = {
         "frame_index": idx,
         "video_url": f"/workspace/sequence/video_frame_{idx:03d}.jpg",
@@ -950,8 +1029,14 @@ def get_wave_analysis(target: str):
         analysis_file = target_path
     
     if analysis_file and os.path.exists(analysis_file):
-        with open(analysis_file, "r") as fa:
-            return JSONResponse(json.load(fa))
+        try:
+            with open(analysis_file, "r") as fa:
+                data = json.load(fa)
+                if isinstance(data, dict):
+                    return JSONResponse(data)
+                return JSONResponse({"error": "Corrupted wave analysis data"}, status_code=500)
+        except Exception as e:
+            return JSONResponse({"error": f"Failed to read wave analysis: {str(e)}"}, status_code=500)
             
     return JSONResponse({"error": "Wave analysis not found for " + target}, status_code=404)
 
@@ -1016,6 +1101,7 @@ def export_circular_arcs_csv(target: str):
         return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
 
     idx = None
+    json_path = None
     if target.startswith("frame_"):
         val = target.replace("frame_", "")
         if val.isdigit():
@@ -1028,28 +1114,45 @@ def export_circular_arcs_csv(target: str):
         idx = int(target)
 
     total_frames = _get_active_total_frames()
-    if idx is None or idx < 0 or idx >= total_frames:
+    if idx is not None:
+        if idx < 0 or idx >= total_frames:
+            return JSONResponse({"error": "Wave analysis not found for " + target}, status_code=404)
+        json_path = os.path.join(WORK_DIR, "sequence", f"wave_analysis_{idx:03d}.json")
+    else:
+        target_path = os.path.realpath(os.path.join(WORK_DIR, "output", target, "wave_analysis.json"))
+        work_real = os.path.realpath(WORK_DIR)
+        if not target_path.startswith(work_real):
+            return JSONResponse({"error": "Access denied"}, status_code=403)
+        if os.path.exists(target_path):
+            json_path = target_path
+        else:
+            return JSONResponse({"error": "Wave analysis not found for " + target}, status_code=404)
+
+    if not json_path or not os.path.exists(json_path):
         return JSONResponse({"error": "Wave analysis not found for " + target}, status_code=404)
 
-    json_path = os.path.join(WORK_DIR, "sequence", f"wave_analysis_{idx:03d}.json")
-    if not os.path.exists(json_path):
-        return JSONResponse({"error": "Wave analysis not found for " + target}, status_code=404)
-
-    with open(json_path, "r") as fa:
-        data = json.load(fa)
+    try:
+        with open(json_path, "r") as fa:
+            data = json.load(fa)
+        if not isinstance(data, dict):
+            return JSONResponse({"error": "Corrupted wave analysis data"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to read wave analysis: {str(e)}"}, status_code=500)
 
     arcs = data.get("circular_arcs_5m", [])
-    if not arcs:
+    if not arcs or not isinstance(arcs, list):
         return JSONResponse({"error": "No circular arc data found"}, status_code=404)
 
     header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
     csv_rows = [header]
     for a in arcs:
-        az_min = a.get("azimuth_min_deg", 0.0)
-        az_max = a.get("azimuth_max_deg", 0.0)
+        if not isinstance(a, dict):
+            continue
+        az_min = float(a.get("azimuth_min_deg") or 0.0)
+        az_max = float(a.get("azimuth_max_deg") or 0.0)
         az_span = round(float(az_max - az_min), 1)
-        r_band = a.get("band_m", "")
-        hs_val = a.get("significant_height_Hs_m", a.get("Hs_m", 0.0))
+        r_band = str(a.get("band_m", ""))
+        hs_val = float(a.get("significant_height_Hs_m", a.get("Hs_m", 0.0)) or 0.0)
         row = (
             f"{a.get('radius_m', 0.0)},"
             f"{r_band},"
@@ -1067,24 +1170,31 @@ def export_circular_arcs_csv(target: str):
         csv_rows.append(row)
 
     csv_data = "".join(csv_rows)
-    out_csv = os.path.join(WORK_DIR, "sequence", f"circular_arcs_{idx:03d}.csv")
-    try:
-        with open(out_csv, "w", newline="") as fc:
-            fc.write(csv_data)
-    except Exception:
-        pass
+    export_name = f"circular_arcs_frame_{idx:03d}.csv" if idx is not None else f"circular_arcs_{target}.csv"
+    if idx is not None:
+        out_csv = os.path.join(WORK_DIR, "sequence", f"circular_arcs_{idx:03d}.csv")
+        try:
+            with open(out_csv, "w", newline="") as fc:
+                fc.write(csv_data)
+        except Exception:
+            pass
 
     return Response(
         content=csv_data,
         media_type="text/csv",
         headers={
-            "Content-Disposition": f'attachment; filename="circular_arcs_frame_{idx:03d}.csv"'
+            "Content-Disposition": f'attachment; filename="{export_name}"'
         }
     )
 
 
-if __name__ == "__main__":
+def main():
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8080"))
     print(f"Starting WASS Web Application on http://{host}:{port} ...")
     uvicorn.run(app, host=host, port=port, log_level="info")
+
+
+if __name__ == "__main__":
+    main()
+

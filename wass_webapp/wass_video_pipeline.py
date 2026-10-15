@@ -108,6 +108,11 @@ def copy_or_create_configs(binaries, config_dir, calib_src_dir=None, width=None,
 
 def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_dir, step=1, max_frames=None):
     """Extract stereo frames from video input into WASS workdir."""
+    if step is None or step < 1:
+        raise ValueError(f"step must be a positive integer (>= 1), got {step}")
+    if max_frames is not None and max_frames < 1:
+        raise ValueError(f"max_frames must be a positive integer (>= 1), got {max_frames}")
+
     cam0_dir = os.path.join(work_dir, "input", "cam0")
     cam1_dir = os.path.join(work_dir, "input", "cam1")
     os.makedirs(cam0_dir, exist_ok=True)
@@ -302,6 +307,13 @@ def main():
     parser.add_argument("--max-frames", type=int, default=10, help="Maximum number of frames to process")
 
     args = parser.parse_args()
+
+    if args.max_frames is not None and args.max_frames < 1:
+        parser.error(f"--max-frames must be a positive integer (>= 1), got {args.max_frames}")
+    if args.step is not None and args.step < 1:
+        parser.error(f"--step must be a positive integer (>= 1), got {args.step}")
+    if not args.video_sbs and not (args.video0 and args.video1):
+        parser.error("Must provide either --video-sbs OR both --video0 and --video1")
 
     binaries = get_wass_binaries()
     os.makedirs(args.work_dir, exist_ok=True)

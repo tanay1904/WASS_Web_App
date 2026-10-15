@@ -15,6 +15,7 @@
 *.ini text eol=lf
 *.toml text eol=lf
 *.csv text eol=lf
+*.sh text eol=lf
 .gitignore text eol=lf
 .gitattributes text eol=lf
 

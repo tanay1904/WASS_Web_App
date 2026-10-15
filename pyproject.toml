@@ -19,13 +19,27 @@ dependencies = [
     "scipy>=1.10.0",
     "pandas>=2.0.0",
     "requests>=2.28.0",
+    "pytest>=7.4.0",
+    "httpx>=0.24.0",
 ]
+
+[project.scripts]
+wass-webapp = "wass_webapp.app:main"
 
 [project.optional-dependencies]
 test = [
     "pytest>=7.4.0",
     "httpx>=0.24.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wass_webapp*"]
+exclude = ["tests*", "wass*", "wass_dist*", "docs*", "scratch*"]
+
+[tool.setuptools.package-data]
+wass_webapp = ["static/**/*", "templates/**/*"]
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
