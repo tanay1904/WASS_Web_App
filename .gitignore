@@ -31,18 +31,23 @@ test_edge_debug.py
 debug_playback.py
 stream_real_frames.py
 test_arc_api.py
-capture_dashboard.py
+capture_*.py
 diagnose_edge.py
 diag_network.py
 test_live_edge.py
 
 # Root diagnostic screenshots, video files, and audit logs (stay local)
-*.png
-*.jpg
-*.jpeg
-*.mp4
-*.MP4
+/*.png
+/*.jpg
+/*.jpeg
+/*.mp4
+/*.MP4
 *_audit_results.json
+level3_audit_results.json
+
+# Whitelist documentation images
+!docs/images/*
+
 level3_audit_results.json
 
 # Webapp intermediate scratch and working directories (stay local)
