@@ -27,7 +27,7 @@
     }
   },
   "waitFor": "postStartCommand",
-  "postCreateCommand": "pip install --upgrade pip && pip install -r requirements.txt && pip install -e . && chmod +x .devcontainer/start-server.sh",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 tmux && pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true && pip install --upgrade pip && pip install -r requirements.txt && pip install -e . && chmod +x .devcontainer/start-server.sh",
   "postStartCommand": "bash .devcontainer/start-server.sh",
   "remoteUser": "vscode"
 }

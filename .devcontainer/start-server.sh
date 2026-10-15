@@ -57,6 +57,17 @@ fi
 # 2. Dependency Verification: Are required packages importable?
 echo "[WASS Codespaces] Verifying runtime dependencies..."
 export PYTHONPATH=".:${PYTHONPATH:-}"
+
+# Check specifically for OpenCV importability (repair libGL.so.1 / headless issue if needed)
+if ! $PYTHON_CMD -c "import cv2" >/dev/null 2>&1; then
+    echo "[WASS Codespaces] Repairing OpenCV headless / Linux graphics library dependencies..."
+    if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update -qq 2>/dev/null && sudo apt-get install -y -qq --no-install-recommends libgl1 libglib2.0-0 2>/dev/null || true
+    fi
+    $PIP_CMD uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true
+    $PIP_CMD install --no-cache-dir opencv-python-headless 2>/dev/null || true
+fi
+
 if ! $PYTHON_CMD -c "import uvicorn, fastapi, cv2, numpy, wass_webapp" >/dev/null 2>&1; then
     echo "[WASS Codespaces] Runtime dependencies missing or incomplete. Installing now..."
     echo "[WASS Codespaces] Running: $PIP_CMD install --upgrade pip && $PIP_CMD install -r requirements.txt && $PIP_CMD install -e ."
