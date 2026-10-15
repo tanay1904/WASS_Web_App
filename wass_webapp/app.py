@@ -43,6 +43,7 @@ import uvicorn
 SAFE_NAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-]+$')
 SAFE_FILENAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-]+(\.[a-zA-Z0-9]+)?$')
 MAX_UPLOAD_SIZE = 150 * 1024 * 1024  # 150 MB
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm", ".m4v"}
 
 WINDOWS_RESERVED_NAMES = {
     "CON", "PRN", "AUX", "NUL",
@@ -101,6 +102,8 @@ async def save_upload_file(upload_file: UploadFile, dest_path: str, max_bytes: i
                 if total_written > max_bytes:
                     raise ValueError(f"Uploaded file exceeds maximum limit of {max_bytes // (1024*1024)}MB")
                 f.write(chunk)
+        if total_written == 0:
+            raise ValueError("Uploaded file is empty (0 bytes)")
     except Exception:
         if os.path.exists(dest_path):
             try:
@@ -121,6 +124,7 @@ _cached_frames_bytes = {}
 
 _cache_points_lock = threading.Lock()
 _cache_analysis_lock = threading.Lock()
+_cache_frames_lock = threading.Lock()
 
 
 def invalidate_caches():
@@ -128,11 +132,14 @@ def invalidate_caches():
     global _cached_all_points, _cached_all_points_bytes
     global _cached_all_analysis, _cached_all_analysis_bytes
     global _cached_frames_bytes
-    _cached_all_points = None
-    _cached_all_points_bytes = None
-    _cached_all_analysis = None
-    _cached_all_analysis_bytes = None
-    _cached_frames_bytes.clear()
+    with _cache_points_lock:
+        _cached_all_points = None
+        _cached_all_points_bytes = None
+    with _cache_analysis_lock:
+        _cached_all_analysis = None
+        _cached_all_analysis_bytes = None
+    with _cache_frames_lock:
+        _cached_frames_bytes.clear()
 
 
 @asynccontextmanager
@@ -466,10 +473,13 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
             s_req = requests.Session()
             s_req.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
             share_link = "https://1drv.ms/f/c/5b0c2115f65927cd/IgASJfo0JRCuTa1Ft6kYRcPLAXMnwQneMbuwA9Gm-Fzsjuw?e=fdSXuB"
-            s_req.get(share_link, allow_redirects=True, timeout=15)
+            resp_share = s_req.get(share_link, allow_redirects=True, timeout=15)
+            resp_share.raise_for_status()
             share_token = "u!aHR0cHM6Ly8xZHJ2Lm1zL2YvYy81YjBjMjExNWY2NTkyN2NkL0lnQVNKZm8wSlJDdVRhMUZ0NmtZUmNQTEFYTW53UW5lTWJ1d0E5R20tRnpzanV3P2U9ZmRTWHVC"
             api_url = f"https://onedrive.live.com/personal/5b0c2115f65927cd/_api/v2.0/shares/{share_token}/driveItem/children"
-            res_json = s_req.get(api_url, timeout=5).json()
+            resp_api = s_req.get(api_url, timeout=5)
+            resp_api.raise_for_status()
+            res_json = resp_api.json()
             items = res_json.get("value", [])
             urls = {it["name"]: it.get("@content.downloadUrl") for it in items if "name" in it}
             if urls:
@@ -818,7 +828,7 @@ def get_status():
 @app.post("/api/run")
 async def start_pipeline(
     background_tasks: BackgroundTasks,
-    video_source: str = Form(...),
+    video_source: str = Form(""),
     cam0_file: UploadFile = File(None),
     cam1_file: UploadFile = File(None),
     sbs_file: UploadFile = File(None),
@@ -866,6 +876,13 @@ async def start_pipeline(
 
         safe_c0 = sanitize_filename(cam0_file.filename)
         safe_c1 = sanitize_filename(cam1_file.filename)
+        ext0 = Path(safe_c0).suffix.lower()
+        ext1 = Path(safe_c1).suffix.lower()
+        if ext0 not in ALLOWED_VIDEO_EXTENSIONS or ext1 not in ALLOWED_VIDEO_EXTENSIONS:
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": f"Invalid video file extension. Only video formats ({', '.join(sorted(ALLOWED_VIDEO_EXTENSIONS))}) are supported."}, status_code=400)
+
         v0_path = os.path.join(UPLOAD_DIR, "cam0_" + safe_c0)
         v1_path = os.path.join(UPLOAD_DIR, "cam1_" + safe_c1)
 
@@ -894,6 +911,12 @@ async def start_pipeline(
             return JSONResponse({"error": "Please upload a side-by-side stereo video"}, status_code=400)
 
         safe_sbs = sanitize_filename(sbs_file.filename)
+        ext_sbs = Path(safe_sbs).suffix.lower()
+        if ext_sbs not in ALLOWED_VIDEO_EXTENSIONS:
+            with pipeline_lock:
+                pipeline_state["status"] = "idle"
+            return JSONResponse({"error": f"Invalid video file extension. Only video formats ({', '.join(sorted(ALLOWED_VIDEO_EXTENSIONS))}) are supported."}, status_code=400)
+
         sbs_path = os.path.join(UPLOAD_DIR, "sbs_" + safe_sbs)
         upload_real = os.path.realpath(UPLOAD_DIR)
         if not os.path.realpath(sbs_path).startswith(upload_real):
@@ -1105,8 +1128,11 @@ def get_sequence_frame(idx: int, request: Request = None):
         pragma = request.headers.get("pragma", "").lower()
         if "no-cache" in cc or "no-cache" in pragma:
             no_cache = True
-    if not no_cache and idx in _cached_frames_bytes:
-        return Response(content=_cached_frames_bytes[idx], media_type="application/json")
+    if not no_cache:
+        with _cache_frames_lock:
+            cached_data = _cached_frames_bytes.get(idx)
+        if cached_data is not None:
+            return Response(content=cached_data, media_type="application/json")
     seq_dir = os.path.join(WORK_DIR, "sequence")
     pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
     if not os.path.exists(pts_file):
@@ -1131,7 +1157,8 @@ def get_sequence_frame(idx: int, request: Request = None):
     }
     encoded = json.dumps(frame_obj).encode("utf-8")
     if not no_cache:
-        _cached_frames_bytes[idx] = encoded
+        with _cache_frames_lock:
+            _cached_frames_bytes[idx] = encoded
     return Response(content=encoded, media_type="application/json")
 
 

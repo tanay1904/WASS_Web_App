@@ -4,6 +4,19 @@ import json
 import numpy as np
 
 
+def _safe_float(val, default=0.0, decimals=None):
+    """Safely convert any numeric value to a finite float, sanitizing NaN, Inf, and overflow."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        if not np.isfinite(f):
+            return default
+        return round(f, decimals) if decimals is not None else f
+    except (ValueError, TypeError, OverflowError):
+        return default
+
+
 def _empty_analysis_fallback(total_points=0):
     """Returns a schema-compliant fallback dictionary for degenerate or empty point clouds."""
     arc_centers = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
@@ -100,7 +113,8 @@ def analyze_xyz(xyz_path, plane_path=None):
                     p1 = float(parts[1])
                     p2 = float(parts[2])
                     if np.isfinite(p0) and np.isfinite(p1) and np.isfinite(p2):
-                        pts.append([p0, p1, p2])
+                        if abs(p0) < 1e7 and abs(p1) < 1e7 and abs(p2) < 1e7:
+                            pts.append([p0, p1, p2])
                 except (ValueError, OverflowError):
                     continue
 
@@ -181,18 +195,20 @@ def analyze_xyz(xyz_path, plane_path=None):
 
     # 3. Wave statistics
     sigma_eta = float(np.std(height_sea_level))
-    sigma_rounded = round(float(np.nan_to_num(sigma_eta, nan=0.0)), 3)
-    hs_rounded = round(float(4.0 * sigma_rounded), 3)
+    sigma_rounded = _safe_float(sigma_eta, default=0.0, decimals=3)
+    hs_rounded = _safe_float(4.0 * sigma_rounded, default=0.0, decimals=3)
     h_min = float(np.min(height_sea_level))
     h_max = float(np.max(height_sea_level))
     h_mean = float(np.mean(height_sea_level))
-    crest_rounded = round(float(np.nan_to_num(h_max, nan=0.0)), 3)
-    trough_rounded = round(float(np.nan_to_num(h_min, nan=0.0)), 3)
-    amp_rounded = round(float(crest_rounded - trough_rounded), 3)
+    crest_rounded = _safe_float(h_max, default=0.0, decimals=3)
+    trough_rounded = _safe_float(h_min, default=0.0, decimals=3)
+    amp_rounded = _safe_float(crest_rounded - trough_rounded, default=0.0, decimals=3)
 
     if sigma_eta > 1e-6:
-        skewness = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**3))
-        kurtosis = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**4))
+        raw_skew = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**3))
+        raw_kurt = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**4))
+        skewness = _safe_float(raw_skew, default=0.0, decimals=3)
+        kurtosis = _safe_float(raw_kurt, default=3.0, decimals=3)
     else:
         skewness = 0.0
         kurtosis = 3.0
@@ -218,18 +234,18 @@ def analyze_xyz(xyz_path, plane_path=None):
         mask = (dist_observer >= r_start) & (dist_observer < r_end)
         if np.sum(mask) >= 3:
             sub_h = height_sea_level[mask]
-            sub_sigma = round(float(np.nan_to_num(np.std(sub_h), nan=0.0)), 3)
-            sub_hs = round(float(4.0 * sub_sigma), 3)
-            sub_crest = round(float(np.nan_to_num(np.max(sub_h), nan=0.0)), 3)
-            sub_trough = round(float(np.nan_to_num(np.min(sub_h), nan=0.0)), 3)
-            sub_amp = round(float(sub_crest - sub_trough), 3)
+            sub_sigma = _safe_float(np.std(sub_h), default=0.0, decimals=3)
+            sub_hs = _safe_float(4.0 * sub_sigma, default=0.0, decimals=3)
+            sub_crest = _safe_float(np.max(sub_h), default=0.0, decimals=3)
+            sub_trough = _safe_float(np.min(sub_h), default=0.0, decimals=3)
+            sub_amp = _safe_float(sub_crest - sub_trough, default=0.0, decimals=3)
             distance_profile.append({
                 "range_m": f"{r_start:.1f} - {r_end:.1f}m",
                 "range_start_m": round(float(r_start), 2),
                 "range_end_m": round(float(r_end), 2),
                 "center_dist_m": round(float((r_start + r_end) / 2.0), 2),
                 "point_count": int(np.sum(mask)),
-                "mean_elevation_m": round(float(np.mean(sub_h)), 3),
+                "mean_elevation_m": _safe_float(np.mean(sub_h), default=0.0, decimals=3),
                 "std_elevation_m": sub_sigma,
                 "crest_m": sub_crest,
                 "trough_m": sub_trough,
@@ -254,15 +270,15 @@ def analyze_xyz(xyz_path, plane_path=None):
         count = int(np.sum(mask))
         if count >= 3:
             sub_h = height_sea_level[mask]
-            sub_sigma = round(float(np.nan_to_num(np.std(sub_h), nan=0.0)), 3)
-            sub_hs = round(float(4.0 * sub_sigma), 3)
-            sub_crest = round(float(np.nan_to_num(np.max(sub_h), nan=0.0)), 3)
-            sub_trough = round(float(np.nan_to_num(np.min(sub_h), nan=0.0)), 3)
-            sub_amp = round(float(sub_crest - sub_trough), 3)
-            sub_mean = round(float(np.mean(sub_h)), 3)
+            sub_sigma = _safe_float(np.std(sub_h), default=0.0, decimals=3)
+            sub_hs = _safe_float(4.0 * sub_sigma, default=0.0, decimals=3)
+            sub_crest = _safe_float(np.max(sub_h), default=0.0, decimals=3)
+            sub_trough = _safe_float(np.min(sub_h), default=0.0, decimals=3)
+            sub_amp = _safe_float(sub_crest - sub_trough, default=0.0, decimals=3)
+            sub_mean = _safe_float(np.mean(sub_h), default=0.0, decimals=3)
             sub_az = azimuth_deg[mask]
-            az_min = round(float(np.min(sub_az)), 1)
-            az_max = round(float(np.max(sub_az)), 1)
+            az_min = _safe_float(np.min(sub_az), default=0.0, decimals=1)
+            az_max = _safe_float(np.max(sub_az), default=0.0, decimals=1)
         else:
             sub_hs = 0.0
             sub_crest = 0.0
@@ -311,7 +327,7 @@ def analyze_xyz(xyz_path, plane_path=None):
 
     result = {
         "total_points": int(len(pts)),
-        "observer_height_m": round(float(np.nan_to_num(observer_height, nan=4.76)), 2),
+        "observer_height_m": _safe_float(observer_height, default=4.76, decimals=2),
         "significant_wave_height_Hs_m": hs_rounded,
         "peak_crest_m": crest_rounded,
         "deepest_trough_m": trough_rounded,
@@ -320,11 +336,11 @@ def analyze_xyz(xyz_path, plane_path=None):
         "wave_amplitude_m": amp_rounded,
         "wave_amplitude_total_m": amp_rounded,
         "elevation_std_sigma_m": sigma_rounded,
-        "mean_elevation_m": round(float(np.nan_to_num(h_mean, nan=0.0)), 4),
-        "elevation_skewness": round(float(np.nan_to_num(skewness, nan=0.0)), 3),
-        "elevation_kurtosis": round(float(np.nan_to_num(kurtosis, nan=3.0)), 3),
+        "mean_elevation_m": _safe_float(h_mean, default=0.0, decimals=4),
+        "elevation_skewness": skewness,
+        "elevation_kurtosis": kurtosis,
         "wave_parameters": {
-            "mean_elevation_m": round(float(np.nan_to_num(h_mean, nan=0.0)), 4),
+            "mean_elevation_m": _safe_float(h_mean, default=0.0, decimals=4),
             "elevation_std_sigma_m": sigma_rounded,
             "significant_wave_height_Hs_m": hs_rounded,
             "peak_crest_m": crest_rounded,
@@ -333,24 +349,24 @@ def analyze_xyz(xyz_path, plane_path=None):
             "trough_depth_min_m": trough_rounded,
             "wave_amplitude_m": amp_rounded,
             "wave_amplitude_total_m": amp_rounded,
-            "skewness": round(float(np.nan_to_num(skewness, nan=0.0)), 3),
-            "kurtosis": round(float(np.nan_to_num(kurtosis, nan=3.0)), 3)
+            "skewness": skewness,
+            "kurtosis": kurtosis
         },
         "distance": {
-            "min_m": round(float(np.nan_to_num(dist_min, nan=0.0)), 2),
-            "max_m": round(float(np.nan_to_num(dist_max, nan=0.0)), 2),
-            "mean_m": round(float(np.nan_to_num(dist_mean, nan=0.0)), 2),
-            "median_m": round(float(np.nan_to_num(dist_median, nan=0.0)), 2)
+            "min_m": _safe_float(dist_min, default=0.0, decimals=2),
+            "max_m": _safe_float(dist_max, default=0.0, decimals=2),
+            "mean_m": _safe_float(dist_mean, default=0.0, decimals=2),
+            "median_m": _safe_float(dist_median, default=0.0, decimals=2)
         },
         "distance_profile": distance_profile,
         "circular_arcs_5m": circular_arcs,
         "elevation_histogram": hist_data,
         "elevation_distribution": dist_data,
         "plane_coefficients": {
-            "a": round(float(np.nan_to_num(n[0], nan=0.0)), 5),
-            "b": round(float(np.nan_to_num(n[1], nan=0.0)), 5),
-            "c": round(float(np.nan_to_num(n[2], nan=1.0)), 5),
-            "d": round(float(np.nan_to_num(d, nan=0.0)), 5)
+            "a": _safe_float(n[0], default=0.0, decimals=5),
+            "b": _safe_float(n[1], default=0.0, decimals=5),
+            "c": _safe_float(n[2], default=1.0, decimals=5),
+            "d": _safe_float(d, default=0.0, decimals=5)
         }
     }
     return result, pts, dist_observer, height_sea_level

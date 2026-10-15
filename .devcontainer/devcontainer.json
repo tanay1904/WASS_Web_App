@@ -30,7 +30,7 @@
   },
   "waitFor": "postStartCommand",
   "updateContentCommand": "pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true && pip install --no-cache-dir -r requirements.txt && pip install -e .",
-  "postCreateCommand": "chmod +x .devcontainer/start-server.sh",
+  "postCreateCommand": "chmod +x .devcontainer/start-server.sh && pip install --no-cache-dir -r requirements.txt && pip install -e .",
   "postStartCommand": "bash .devcontainer/start-server.sh",
   "remoteUser": "vscode"
 }
