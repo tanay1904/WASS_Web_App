@@ -8,7 +8,28 @@ import subprocess
 import re
 from pathlib import Path
 from contextlib import asynccontextmanager
-import cv2
+try:
+    import cv2
+except ImportError:
+    try:
+        from wass_webapp import ensure_opencv
+        ensure_opencv()
+        import cv2
+    except Exception:
+        import importlib
+        for mod in list(sys.modules.keys()):
+            if mod == "cv2" or mod.startswith("cv2."):
+                sys.modules.pop(mod, None)
+        if sys.platform.startswith("linux"):
+            try:
+                subprocess.run(["sudo", "apt-get", "update", "-qq"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                subprocess.run(["sudo", "apt-get", "install", "-y", "-qq", "--no-install-recommends", "libgl1", "libglib2.0-0"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+            except Exception:
+                pass
+        subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python", "opencv-contrib-python"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+        subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", "opencv-python-headless"], check=True, timeout=90)
+        importlib.invalidate_caches()
+        import cv2
 import numpy as np
 import asyncio
 if sys.platform == 'win32':
