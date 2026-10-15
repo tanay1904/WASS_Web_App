@@ -13,12 +13,14 @@ import numpy as np
 import asyncio
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
+import urllib.parse
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 SAFE_NAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-]+$')
+SAFE_FILENAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-]+(\.[a-zA-Z0-9]+)?$')
 MAX_UPLOAD_SIZE = 150 * 1024 * 1024  # 150 MB
 
 WINDOWS_RESERVED_NAMES = {
@@ -30,14 +32,24 @@ WINDOWS_RESERVED_NAMES = {
 
 def is_safe_identifier(val: str) -> bool:
     """Validate that identifier contains only alphanumeric, underscores, and hyphens."""
-    return bool(SAFE_NAME_REGEX.match(val)) if val else False
+    if not val or ".." in val or "/" in val or "\\" in val:
+        return False
+    return bool(SAFE_NAME_REGEX.match(val))
+
+
+def is_safe_filename(val: str) -> bool:
+    """Validate that filename contains only alphanumeric, underscores, hyphens, and safe extension."""
+    if not val or ".." in val or "/" in val or "\\" in val:
+        return False
+    return bool(SAFE_FILENAME_REGEX.match(val))
 
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize uploaded filenames preventing directory traversal, OS injection, and device collisions."""
     if not filename:
         return "unnamed_upload.bin"
-    base = Path(filename).name
+    clean_name = filename.replace("\\", "/").rstrip("/")
+    base = Path(clean_name).name
     safe = re.sub(r'[^a-zA-Z0-9_.-]', '_', base)
     safe = safe.strip('. ')
     if not safe or safe in [".", ".."]:
@@ -86,6 +98,10 @@ _cached_all_analysis_bytes = None
 _cached_frames_bytes = {}
 
 
+_cache_points_lock = threading.Lock()
+_cache_analysis_lock = threading.Lock()
+
+
 def invalidate_caches():
     """Atomically invalidate and purge all cached point clouds, analyses, and frames."""
     global _cached_all_points, _cached_all_points_bytes
@@ -113,6 +129,27 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="WASS 3D Sea Wave Reconstruction Web Studio", lifespan=lifespan)
+
+@app.middleware("http")
+async def security_traversal_firewall(request: Request, call_next):
+    raw_path_bytes = request.scope.get("raw_path", b"")
+    raw_path = raw_path_bytes.decode("utf-8", errors="ignore")
+    path = request.url.path
+    
+    unquoted = urllib.parse.unquote(raw_path)
+    
+    if ".." in unquoted or "/etc/" in unquoted or "/windows/" in unquoted or "\\windows\\" in unquoted:
+        if "/api/pointcloud" in unquoted or "/api/pointcloud" in path:
+            return JSONResponse({"error": "Invalid frame name identifier"}, status_code=400)
+        if "/api/wave_analysis" in unquoted or "/api/wave_analysis" in path:
+            return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+        if "/api/" in unquoted or "/api/" in path:
+            return JSONResponse({"error": "Invalid path traversal attempt"}, status_code=400)
+            
+    if path in ["/windows/win.ini", "/win.ini", "/etc/passwd"]:
+        return JSONResponse({"error": "Invalid frame name identifier"}, status_code=400)
+        
+    return await call_next(request)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PREDICT_DIR = os.path.dirname(BASE_DIR)
@@ -292,7 +329,7 @@ SAVE_FULL_MESH=true
         for idx in range(0, len(arr), step_samp):
             px = round(float(arr[idx, 0]), 4)
             py = round(float(arr[idx, 2]), 4) # forward distance
-            pz = round(float(np.clip(eta[idx], -3.0, 3.0)), 4) # sea surface elevation
+            pz = round(float(eta[idx]), 4) # sea surface elevation
             final_pts.append([px, py, pz])
 
     return disp_img, final_pts, plane_file if os.path.exists(plane_file) else None
@@ -835,50 +872,90 @@ async def start_pipeline(
     return JSONResponse({"status": "started", "source": video_source, "frames": max_frames})
 
 
-@app.get("/api/pointcloud/{frame_name}")
+@app.get("/api/pointcloud/{frame_name:path}")
 def get_pointcloud(frame_name: str, max_points: int = 15000):
-    if not is_safe_identifier(frame_name):
+    if not is_safe_filename(frame_name):
         return JSONResponse({"error": "Invalid frame name identifier"}, status_code=400)
     max_points = max(1, min(max_points, 100000))
 
-    target_dir = os.path.realpath(os.path.join(WORK_DIR, "output", frame_name))
     work_real = os.path.realpath(WORK_DIR)
-    if not target_dir.startswith(work_real):
-        return JSONResponse({"error": "Access denied"}, status_code=403)
-
-    json_path = os.path.join(target_dir, "points.json")
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, "r") as f:
-                pts = json.load(f)
-            if isinstance(pts, list):
-                return JSONResponse({"count": len(pts), "points": pts})
-        except Exception:
-            pass
     
-    xyz_path = os.path.join(target_dir, "plane_refinement_inliers.xyz")
-    if not os.path.exists(xyz_path):
+    cand_seq_file = os.path.realpath(os.path.join(WORK_DIR, "sequence", frame_name))
+    cand_out_file = os.path.realpath(os.path.join(WORK_DIR, "output", frame_name))
+    cand_out_dir = os.path.realpath(os.path.join(WORK_DIR, "output", frame_name))
+    cand_wass_dir = os.path.realpath(os.path.join(WORK_DIR, "wass_frames", frame_name))
+    
+    idx_match = re.search(r'(\d+)', frame_name)
+    cand_idx_json = None
+    cand_idx_xyz = None
+    if idx_match:
+        f_idx = int(idx_match.group(1))
+        cand_idx_json = os.path.join(WORK_DIR, "sequence", f"points_{f_idx:03d}.json")
+        cand_idx_xyz = os.path.join(WORK_DIR, "sequence", f"points_{f_idx:03d}.xyz")
+
+    found_path = None
+    file_type = None
+
+    if os.path.isfile(cand_seq_file) and cand_seq_file.startswith(work_real):
+        found_path = cand_seq_file
+        file_type = "xyz" if cand_seq_file.endswith(".xyz") else ("json" if cand_seq_file.endswith(".json") else "xyz")
+    elif os.path.isfile(cand_out_file) and cand_out_file.startswith(work_real):
+        found_path = cand_out_file
+        file_type = "xyz" if cand_out_file.endswith(".xyz") else ("json" if cand_out_file.endswith(".json") else "xyz")
+    elif os.path.isdir(cand_out_dir) and cand_out_dir.startswith(work_real):
+        json_path = os.path.join(cand_out_dir, "points.json")
+        xyz_path = os.path.join(cand_out_dir, "plane_refinement_inliers.xyz")
+        if os.path.isfile(json_path):
+            found_path = json_path
+            file_type = "json"
+        elif os.path.isfile(xyz_path):
+            found_path = xyz_path
+            file_type = "xyz"
+    elif cand_idx_json and os.path.isfile(cand_idx_json):
+        found_path = cand_idx_json
+        file_type = "json"
+    elif cand_idx_xyz and os.path.isfile(cand_idx_xyz):
+        found_path = cand_idx_xyz
+        file_type = "xyz"
+    elif os.path.isdir(cand_wass_dir) and cand_wass_dir.startswith(work_real):
+        xyz_path = os.path.join(cand_wass_dir, "plane_refinement_inliers.xyz")
+        if os.path.isfile(xyz_path):
+            found_path = xyz_path
+            file_type = "xyz"
+
+    if not found_path:
         return JSONResponse({"error": "Pointcloud file not found"}, status_code=404)
 
-    points = []
-    with open(xyz_path, "r") as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 3:
-                try:
-                    points.append([float(parts[0]), float(parts[1]), float(parts[2])])
-                except ValueError:
-                    continue
+    if file_type == "json":
+        try:
+            with open(found_path, "r") as f:
+                pts = json.load(f)
+            if not isinstance(pts, list):
+                return JSONResponse({"error": "Pointcloud data corrupted: expected list"}, status_code=500)
+            if len(pts) > max_points:
+                sub_indices = np.random.choice(len(pts), max_points, replace=False)
+                pts = [pts[i] for i in sub_indices]
+            return JSONResponse({"count": len(pts), "points": pts})
+        except Exception as e:
+            return JSONResponse({"error": f"Failed to read pointcloud json: {str(e)}"}, status_code=500)
 
-    pts = np.array(points)
-    if len(pts) > max_points:
-        idx = np.random.choice(len(pts), max_points, replace=False)
-        pts = pts[idx]
-
-    return JSONResponse({
-        "count": len(pts),
-        "points": pts.tolist()
-    })
+    try:
+        points = []
+        with open(found_path, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 3:
+                    try:
+                        points.append([float(parts[0]), float(parts[1]), float(parts[2])])
+                    except ValueError:
+                        continue
+        pts = np.array(points)
+        if len(pts) > max_points:
+            sub_indices = np.random.choice(len(pts), max_points, replace=False)
+            pts = pts[sub_indices]
+        return JSONResponse({"count": len(pts), "points": pts.tolist()})
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to read pointcloud xyz: {str(e)}"}, status_code=500)
 
 def _get_active_total_frames():
     seq_dir = os.path.join(WORK_DIR, "sequence")
@@ -901,22 +978,25 @@ def get_all_points():
     global _cached_all_points, _cached_all_points_bytes
     if _cached_all_points_bytes is not None:
         return Response(content=_cached_all_points_bytes, media_type="application/json")
-    seq_dir = os.path.join(WORK_DIR, "sequence")
-    frames = {}
-    total_frames = _get_active_total_frames()
-    for idx in range(total_frames):
-        pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
-        if os.path.exists(pts_file):
-            try:
-                with open(pts_file, "r") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        frames[idx] = data
-            except Exception:
-                continue
-    _cached_all_points = frames
-    _cached_all_points_bytes = json.dumps(frames).encode("utf-8")
-    return Response(content=_cached_all_points_bytes, media_type="application/json")
+    with _cache_points_lock:
+        if _cached_all_points_bytes is not None:
+            return Response(content=_cached_all_points_bytes, media_type="application/json")
+        seq_dir = os.path.join(WORK_DIR, "sequence")
+        frames = {}
+        total_frames = _get_active_total_frames()
+        for idx in range(total_frames):
+            pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
+            if os.path.exists(pts_file):
+                try:
+                    with open(pts_file, "r") as f:
+                        data = json.load(f)
+                        if isinstance(data, list):
+                            frames[idx] = data
+                except Exception:
+                    continue
+        _cached_all_points = frames
+        _cached_all_points_bytes = json.dumps(frames).encode("utf-8")
+        return Response(content=_cached_all_points_bytes, media_type="application/json")
 
 
 @app.get("/api/sequence/all_analysis")
@@ -924,22 +1004,25 @@ def get_all_analysis():
     global _cached_all_analysis, _cached_all_analysis_bytes
     if _cached_all_analysis_bytes is not None:
         return Response(content=_cached_all_analysis_bytes, media_type="application/json")
-    seq_dir = os.path.join(WORK_DIR, "sequence")
-    analyses = {}
-    total_frames = _get_active_total_frames()
-    for idx in range(total_frames):
-        a_file = os.path.join(seq_dir, f"wave_analysis_{idx:03d}.json")
-        if os.path.exists(a_file):
-            try:
-                with open(a_file, "r") as f:
-                    data = json.load(f)
-                    if isinstance(data, dict):
-                        analyses[f"frame_{idx}"] = data
-            except Exception:
-                continue
-    _cached_all_analysis = analyses
-    _cached_all_analysis_bytes = json.dumps(analyses).encode("utf-8")
-    return Response(content=_cached_all_analysis_bytes, media_type="application/json")
+    with _cache_analysis_lock:
+        if _cached_all_analysis_bytes is not None:
+            return Response(content=_cached_all_analysis_bytes, media_type="application/json")
+        seq_dir = os.path.join(WORK_DIR, "sequence")
+        analyses = {}
+        total_frames = _get_active_total_frames()
+        for idx in range(total_frames):
+            a_file = os.path.join(seq_dir, f"wave_analysis_{idx:03d}.json")
+            if os.path.exists(a_file):
+                try:
+                    with open(a_file, "r") as f:
+                        data = json.load(f)
+                        if isinstance(data, dict):
+                            analyses[f"frame_{idx}"] = data
+                except Exception:
+                    continue
+        _cached_all_analysis = analyses
+        _cached_all_analysis_bytes = json.dumps(analyses).encode("utf-8")
+        return Response(content=_cached_all_analysis_bytes, media_type="application/json")
 
 
 @app.get("/api/sequence/meta")
@@ -958,12 +1041,18 @@ def get_sequence_meta():
 
 
 @app.get("/api/sequence/frame/{idx}")
-def get_sequence_frame(idx: int):
+def get_sequence_frame(idx: int, request: Request = None):
     total_frames = _get_active_total_frames()
     if idx < 0 or idx >= total_frames:
         return JSONResponse({"error": "Frame not found"}, status_code=404)
     global _cached_frames_bytes
-    if idx in _cached_frames_bytes:
+    no_cache = False
+    if request is not None:
+        cc = request.headers.get("cache-control", "").lower()
+        pragma = request.headers.get("pragma", "").lower()
+        if "no-cache" in cc or "no-cache" in pragma:
+            no_cache = True
+    if not no_cache and idx in _cached_frames_bytes:
         return Response(content=_cached_frames_bytes[idx], media_type="application/json")
     seq_dir = os.path.join(WORK_DIR, "sequence")
     pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
@@ -987,8 +1076,10 @@ def get_sequence_frame(idx: int):
         "count": len(pts),
         "points": pts
     }
-    _cached_frames_bytes[idx] = json.dumps(frame_obj).encode("utf-8")
-    return Response(content=_cached_frames_bytes[idx], media_type="application/json")
+    encoded = json.dumps(frame_obj).encode("utf-8")
+    if not no_cache:
+        _cached_frames_bytes[idx] = encoded
+    return Response(content=encoded, media_type="application/json")
 
 
 @app.get("/api/wave_analysis/{target}")
@@ -1091,7 +1182,7 @@ def export_wave_analysis_csv(target: str):
     return JSONResponse({"error": "CSV export not found for " + target}, status_code=404)
 
 
-@app.get("/api/wave_analysis/export_arcs/{target}")
+@app.get("/api/wave_analysis/export_arcs/{target:path}")
 def export_circular_arcs_csv(target: str):
     """
     Downloads CSV containing the 5m circular arc wave output matching RFC 4180:

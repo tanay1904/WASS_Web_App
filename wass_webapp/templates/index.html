@@ -467,7 +467,7 @@
     <ul class="nav nav-pills gap-2" id="studioTabs" role="tablist">
       <li class="nav-item" role="presentation">
         <button class="btn btn-outline-custom active px-3 py-1 fw-semibold" id="tabPlayerBtn" onclick="showTab('player')" type="button">
-          <i class="fa-solid fa-chart-area me-2 text-info"></i> 1. Wave Studio & Continuous Stereo Player
+          <i class="fa-solid fa-chart-area me-2 text-info"></i> 1. Real-Time Wave Studio & Continuous Stereo Player
         </button>
       </li>
       <li class="nav-item" role="presentation">
@@ -509,6 +509,9 @@
                   </button>
                   <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamRight" onclick="setStreamMode('right')" title="Right Camera Cam 1 (GX011273)">
                     <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right)
+                  </button>
+                  <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamDisp" onclick="setStreamMode('disparity')" title="Dense Stereo Disparity Field">
+                    <i class="fa-solid fa-water me-1"></i> Dense Disparity
                   </button>
                 </div>
                 <span class="pill-badge" id="streamModeBadge">Dual Stereo (SBS)</span>
@@ -1118,6 +1121,11 @@
           });
         });
         scene.add(rangeArcsGroup);
+        window.camera = camera;
+        window.controls = controls;
+        window.scene = scene;
+        window.renderer = renderer;
+        window.rangeArcsGroup = rangeArcsGroup;
 
         // Ambient + Directional lighting (balanced for natural oceanic depth, no glare)
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.28);
@@ -1597,6 +1605,7 @@
     function animate() {
       requestAnimationFrame(animate);
       if (activeStudioTab !== 'player') return; // Pause WebGL render loop when Tab 2 is active
+      window.__wassRenderCount = (window.__wassRenderCount || 0) + 1;
       if (controls) controls.update();
       if (renderer && scene && camera) renderer.render(scene, camera);
     }
@@ -1628,6 +1637,8 @@
       document.getElementById('btnStreamDual').classList.toggle('active', m === 'dual');
       document.getElementById('btnStreamLeft').classList.toggle('active', m === 'left');
       document.getElementById('btnStreamRight').classList.toggle('active', m === 'right');
+      const btnDisp = document.getElementById('btnStreamDisp');
+      if (btnDisp) btnDisp.classList.toggle('active', m === 'disparity');
 
       const dualCont = document.getElementById('dualStreamContainer');
       const singleCont = document.getElementById('singleStreamContainer');
@@ -1648,6 +1659,9 @@
         } else if (m === 'right') {
           badge.innerText = 'Cam 1 Right (GX011273)';
           document.getElementById('camTagBadge').innerText = 'GoPro Cam 1 (GX011273)';
+        } else if (m === 'disparity') {
+          badge.innerText = 'Dense Stereo Disparity';
+          document.getElementById('camTagBadge').innerText = 'Dense Disparity Depth Field';
         }
         updateSingleStreamSource(currentFrame);
       }
@@ -1665,6 +1679,8 @@
           singleImg.src = `/workspace/sequence/video_frame_left_${padIdx}.jpg?t=v3`;
         } else if (currentStreamMode === 'right') {
           singleImg.src = `/workspace/sequence/video_frame_right_${padIdx}.jpg?t=v3`;
+        } else if (currentStreamMode === 'disparity') {
+          singleImg.src = `/workspace/sequence/disparity_${padIdx}.png?t=v3`;
         }
       }
     }
@@ -2068,13 +2084,15 @@
       }
     }
 
-    async function exportWaveAnalysisCsv(e) {
-      if (e) e.preventDefault();
-      let target = '';
-      if (mode === 'sequence') {
-        target = 'frame_' + currentFrame;
-      } else {
-        target = document.getElementById('datasetSelector').value;
+    async function exportWaveAnalysisCsv(e, targetOverride) {
+      if (e && e.preventDefault) e.preventDefault();
+      let target = targetOverride || '';
+      if (!target) {
+        if (mode === 'sequence') {
+          target = 'frame_' + currentFrame;
+        } else {
+          target = document.getElementById('datasetSelector').value;
+        }
       }
 
       showToast(`Preparing CSV export for ${target}...`, 'info');
@@ -2203,6 +2221,7 @@
     function toggleRangeArcs() {
       rangeArcsVisible = !rangeArcsVisible;
       if (rangeArcsGroup) rangeArcsGroup.visible = rangeArcsVisible;
+      window.rangeArcsGroup = rangeArcsGroup;
       const btn = document.getElementById('btnToggleRangeArcs');
       if (btn) {
         btn.classList.toggle('active', rangeArcsVisible);
@@ -2210,12 +2229,14 @@
       }
     }
 
-    async function exportCurrentArcsCsv() {
-      let target = '';
-      if (mode === 'sequence') {
-        target = 'sequence_' + String(currentFrame).padStart(3, '0');
-      } else {
-        target = document.getElementById('datasetSelector').value;
+    async function exportCurrentArcsCsv(targetOverride) {
+      let target = targetOverride || '';
+      if (!target) {
+        if (mode === 'sequence') {
+          target = 'sequence_' + String(currentFrame).padStart(3, '0');
+        } else {
+          target = document.getElementById('datasetSelector').value;
+        }
       }
 
       showToast(`Preparing 5m Arcs export for ${target}...`, 'info');

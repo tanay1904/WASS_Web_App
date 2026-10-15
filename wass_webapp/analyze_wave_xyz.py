@@ -30,12 +30,23 @@ def _empty_analysis_fallback(total_points=0):
         "significant_wave_height_Hs_m": 0.0,
         "peak_crest_m": 0.0,
         "deepest_trough_m": 0.0,
+        "crest_elevation_max_m": 0.0,
+        "trough_depth_min_m": 0.0,
+        "wave_amplitude_m": 0.0,
+        "wave_amplitude_total_m": 0.0,
+        "elevation_std_sigma_m": 0.0,
+        "mean_elevation_m": 0.0,
+        "elevation_skewness": 0.0,
+        "elevation_kurtosis": 3.0,
         "wave_parameters": {
             "mean_elevation_m": 0.0,
             "elevation_std_sigma_m": 0.0,
             "significant_wave_height_Hs_m": 0.0,
+            "peak_crest_m": 0.0,
+            "deepest_trough_m": 0.0,
             "crest_elevation_max_m": 0.0,
             "trough_depth_min_m": 0.0,
+            "wave_amplitude_m": 0.0,
             "wave_amplitude_total_m": 0.0,
             "skewness": 0.0,
             "kurtosis": 3.0
@@ -170,10 +181,14 @@ def analyze_xyz(xyz_path, plane_path=None):
 
     # 3. Wave statistics
     sigma_eta = float(np.std(height_sea_level))
-    Hs = 4.0 * sigma_eta  # Significant wave height (standard oceanographic definition)
+    sigma_rounded = round(float(np.nan_to_num(sigma_eta, nan=0.0)), 3)
+    hs_rounded = round(float(4.0 * sigma_rounded), 3)
     h_min = float(np.min(height_sea_level))
     h_max = float(np.max(height_sea_level))
     h_mean = float(np.mean(height_sea_level))
+    crest_rounded = round(float(np.nan_to_num(h_max, nan=0.0)), 3)
+    trough_rounded = round(float(np.nan_to_num(h_min, nan=0.0)), 3)
+    amp_rounded = round(float(crest_rounded - trough_rounded), 3)
 
     if sigma_eta > 1e-6:
         skewness = float(np.mean(((height_sea_level - h_mean) / sigma_eta)**3))
@@ -203,7 +218,11 @@ def analyze_xyz(xyz_path, plane_path=None):
         mask = (dist_observer >= r_start) & (dist_observer < r_end)
         if np.sum(mask) >= 3:
             sub_h = height_sea_level[mask]
-            sub_hs = round(float(4.0 * np.std(sub_h)), 3)
+            sub_sigma = round(float(np.nan_to_num(np.std(sub_h), nan=0.0)), 3)
+            sub_hs = round(float(4.0 * sub_sigma), 3)
+            sub_crest = round(float(np.nan_to_num(np.max(sub_h), nan=0.0)), 3)
+            sub_trough = round(float(np.nan_to_num(np.min(sub_h), nan=0.0)), 3)
+            sub_amp = round(float(sub_crest - sub_trough), 3)
             distance_profile.append({
                 "range_m": f"{r_start:.1f} - {r_end:.1f}m",
                 "range_start_m": round(float(r_start), 2),
@@ -211,9 +230,10 @@ def analyze_xyz(xyz_path, plane_path=None):
                 "center_dist_m": round(float((r_start + r_end) / 2.0), 2),
                 "point_count": int(np.sum(mask)),
                 "mean_elevation_m": round(float(np.mean(sub_h)), 3),
-                "crest_m": round(float(np.max(sub_h)), 3),
-                "trough_m": round(float(np.min(sub_h)), 3),
-                "amplitude_m": round(float(np.max(sub_h) - np.min(sub_h)), 3),
+                "std_elevation_m": sub_sigma,
+                "crest_m": sub_crest,
+                "trough_m": sub_trough,
+                "amplitude_m": sub_amp,
                 "significant_height_m": sub_hs,
                 "Hs_m": sub_hs
             })
@@ -234,12 +254,12 @@ def analyze_xyz(xyz_path, plane_path=None):
         count = int(np.sum(mask))
         if count >= 3:
             sub_h = height_sea_level[mask]
-            sub_hs = round(float(4.0 * np.std(sub_h)), 3)
-            sub_crest = round(float(np.max(sub_h)), 3)
-            sub_trough = round(float(np.min(sub_h)), 3)
+            sub_sigma = round(float(np.nan_to_num(np.std(sub_h), nan=0.0)), 3)
+            sub_hs = round(float(4.0 * sub_sigma), 3)
+            sub_crest = round(float(np.nan_to_num(np.max(sub_h), nan=0.0)), 3)
+            sub_trough = round(float(np.nan_to_num(np.min(sub_h), nan=0.0)), 3)
             sub_amp = round(float(sub_crest - sub_trough), 3)
             sub_mean = round(float(np.mean(sub_h)), 3)
-            sub_sigma = round(float(np.std(sub_h)), 3)
             sub_az = azimuth_deg[mask]
             az_min = round(float(np.min(sub_az)), 1)
             az_max = round(float(np.max(sub_az)), 1)
@@ -292,16 +312,27 @@ def analyze_xyz(xyz_path, plane_path=None):
     result = {
         "total_points": int(len(pts)),
         "observer_height_m": round(float(np.nan_to_num(observer_height, nan=4.76)), 2),
-        "significant_wave_height_Hs_m": round(float(np.nan_to_num(Hs, nan=0.0)), 3),
-        "peak_crest_m": round(float(np.nan_to_num(h_max, nan=0.0)), 3),
-        "deepest_trough_m": round(float(np.nan_to_num(h_min, nan=0.0)), 3),
+        "significant_wave_height_Hs_m": hs_rounded,
+        "peak_crest_m": crest_rounded,
+        "deepest_trough_m": trough_rounded,
+        "crest_elevation_max_m": crest_rounded,
+        "trough_depth_min_m": trough_rounded,
+        "wave_amplitude_m": amp_rounded,
+        "wave_amplitude_total_m": amp_rounded,
+        "elevation_std_sigma_m": sigma_rounded,
+        "mean_elevation_m": round(float(np.nan_to_num(h_mean, nan=0.0)), 4),
+        "elevation_skewness": round(float(np.nan_to_num(skewness, nan=0.0)), 3),
+        "elevation_kurtosis": round(float(np.nan_to_num(kurtosis, nan=3.0)), 3),
         "wave_parameters": {
-            "mean_elevation_m": round(float(np.nan_to_num(h_mean, nan=0.0)), 3),
-            "elevation_std_sigma_m": round(float(np.nan_to_num(sigma_eta, nan=0.0)), 3),
-            "significant_wave_height_Hs_m": round(float(np.nan_to_num(Hs, nan=0.0)), 3),
-            "crest_elevation_max_m": round(float(np.nan_to_num(h_max, nan=0.0)), 3),
-            "trough_depth_min_m": round(float(np.nan_to_num(h_min, nan=0.0)), 3),
-            "wave_amplitude_total_m": round(float(np.nan_to_num(h_max - h_min, nan=0.0)), 3),
+            "mean_elevation_m": round(float(np.nan_to_num(h_mean, nan=0.0)), 4),
+            "elevation_std_sigma_m": sigma_rounded,
+            "significant_wave_height_Hs_m": hs_rounded,
+            "peak_crest_m": crest_rounded,
+            "deepest_trough_m": trough_rounded,
+            "crest_elevation_max_m": crest_rounded,
+            "trough_depth_min_m": trough_rounded,
+            "wave_amplitude_m": amp_rounded,
+            "wave_amplitude_total_m": amp_rounded,
             "skewness": round(float(np.nan_to_num(skewness, nan=0.0)), 3),
             "kurtosis": round(float(np.nan_to_num(kurtosis, nan=3.0)), 3)
         },

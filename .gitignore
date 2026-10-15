@@ -29,6 +29,8 @@ wass_dist/
 wass/
 
 # Root diagnostic, benchmark, and audit scripts (stay local)
+/test_*.py
+/verify_*.py
 audit_*.py
 run_*.py
 test_edge_debug.py
@@ -39,6 +41,7 @@ capture_*.py
 diagnose_edge.py
 diag_network.py
 test_live_edge.py
+wass_webapp/workspace/sequence/circular_arcs_*.csv
 
 # Root diagnostic screenshots, video files, and audit logs (stay local)
 /*.png
@@ -48,6 +51,8 @@ test_live_edge.py
 /*.MP4
 *_audit_results.json
 level3_audit_results.json
+*_results.json
+*.jsonl
 
 # Whitelist documentation images
 !docs/images/*
@@ -70,6 +75,7 @@ wass_webapp/workspace/sequence/*_07[0-9]*
 wass_webapp/workspace/sequence/*_08[0-9]*
 wass_webapp/workspace/sequence/*_09[0-9]*
 wass_webapp/workspace/sequence/*_[1-9][0-9][0-9]*
+wass_webapp/workspace/sequence/*.xyz
 
 # System / OS
 .DS_Store
