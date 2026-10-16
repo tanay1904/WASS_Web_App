@@ -1,0 +1,40 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start WASS 3D Wave Studio",
+      "type": "shell",
+      "command": "bash .devcontainer/start-server.sh || python -m uvicorn wass_webapp.app:app --host 0.0.0.0 --port 8080",
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*(Uvicorn running on|Starting Uvicorn|SUCCESS).*",
+          "endsPattern": ".*(Application startup complete|SUCCESS).*"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "WASS Codespaces Live Monitor (High Accuracy)",
+      "type": "shell",
+      "command": "python .devcontainer/codespaces_monitor.py --interval 0.5",
+      "isBackground": false,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": false
+      }
+    }
+  ]
+}

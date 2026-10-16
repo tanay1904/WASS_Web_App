@@ -202,19 +202,20 @@ def test_upload_path_traversal_filename_sanitized():
     with pipeline_lock:
         pipeline_state["status"] = "idle"
 
-    blob = io.BytesIO(b"dummy video data for traversal test")
-    resp = client.post(
-        "/api/run",
-        data={"video_source": "dual", "max_frames": 2, "step": 1},
-        files={
-            "cam0_file": ("../../evil.mp4", blob, "video/mp4"),
-            "cam1_file": ("..\\..\\evil2.mp4", blob, "video/mp4"),
-        }
-    )
-    assert resp.status_code == 200
-    # Must not write to root directory
-    assert not os.path.exists(os.path.join(ROOT_DIR, "evil.mp4"))
-    assert not os.path.exists(os.path.join(ROOT_DIR, "evil2.mp4"))
+    with patch("app.run_pipeline_worker"):
+        blob = io.BytesIO(b"dummy video data for traversal test")
+        resp = client.post(
+            "/api/run",
+            data={"video_source": "dual", "max_frames": 2, "step": 1},
+            files={
+                "cam0_file": ("../../evil.mp4", blob, "video/mp4"),
+                "cam1_file": ("..\\..\\evil2.mp4", blob, "video/mp4"),
+            }
+        )
+        assert resp.status_code == 200
+        # Must not write to root directory
+        assert not os.path.exists(os.path.join(ROOT_DIR, "evil.mp4"))
+        assert not os.path.exists(os.path.join(ROOT_DIR, "evil2.mp4"))
 
     with pipeline_lock:
         pipeline_state["status"] = "completed"
@@ -225,17 +226,18 @@ def test_upload_corrupt_binary_blob_handling():
     with pipeline_lock:
         pipeline_state["status"] = "idle"
 
-    corrupt_blob = io.BytesIO(os.urandom(1024))
-    resp = client.post(
-        "/api/run",
-        data={"video_source": "dual", "max_frames": 2, "step": 1},
-        files={
-            "cam0_file": ("corrupt_cam0.mp4", corrupt_blob, "video/mp4"),
-            "cam1_file": ("corrupt_cam1.mp4", corrupt_blob, "video/mp4"),
-        }
-    )
-    assert resp.status_code == 200
-    assert resp.json().get("status") == "started"
+    with patch("app.run_pipeline_worker"):
+        corrupt_blob = io.BytesIO(os.urandom(1024))
+        resp = client.post(
+            "/api/run",
+            data={"video_source": "dual", "max_frames": 2, "step": 1},
+            files={
+                "cam0_file": ("corrupt_cam0.mp4", corrupt_blob, "video/mp4"),
+                "cam1_file": ("corrupt_cam1.mp4", corrupt_blob, "video/mp4"),
+            }
+        )
+        assert resp.status_code == 200
+        assert resp.json().get("status") == "started"
 
     with pipeline_lock:
         pipeline_state["status"] = "completed"

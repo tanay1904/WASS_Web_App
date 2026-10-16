@@ -1,6 +1,7 @@
 import os
 import sys
 import io
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -71,21 +72,22 @@ def test_upload_filename_traversal():
     with pipeline_lock:
         pipeline_state["status"] = "idle"
 
-    fake_video = io.BytesIO(b"fake mp4 video content")
-    resp = client.post(
-        "/api/run",
-        data={"video_source": "dual", "max_frames": 5, "step": 1},
-        files={
-            "cam0_file": ("../../evil_cam0.mp4", fake_video, "video/mp4"),
-            "cam1_file": ("..\\..\\evil_cam1.mp4", fake_video, "video/mp4"),
-        }
-    )
-    # The uploaded files must be saved cleanly inside uploads/ as sanitized names
-    assert resp.status_code == 200
-    upload_dir = os.path.join(WEBAPP_DIR, "uploads")
-    # Traversal should not escape uploads
-    assert not os.path.exists(os.path.join(WEBAPP_DIR, "evil_cam0.mp4"))
-    assert not os.path.exists(os.path.join(ROOT_DIR, "evil_cam0.mp4"))
+    with patch("app.run_pipeline_worker"):
+        fake_video = io.BytesIO(b"fake mp4 video content")
+        resp = client.post(
+            "/api/run",
+            data={"video_source": "dual", "max_frames": 5, "step": 1},
+            files={
+                "cam0_file": ("../../evil_cam0.mp4", fake_video, "video/mp4"),
+                "cam1_file": ("..\\..\\evil_cam1.mp4", fake_video, "video/mp4"),
+            }
+        )
+        # The uploaded files must be saved cleanly inside uploads/ as sanitized names
+        assert resp.status_code == 200
+        upload_dir = os.path.join(WEBAPP_DIR, "uploads")
+        # Traversal should not escape uploads
+        assert not os.path.exists(os.path.join(WEBAPP_DIR, "evil_cam0.mp4"))
+        assert not os.path.exists(os.path.join(ROOT_DIR, "evil_cam0.mp4"))
 
     # Cleanup state
     with pipeline_lock:
