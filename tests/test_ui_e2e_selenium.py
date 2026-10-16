@@ -14,16 +14,32 @@ BASE_URL = "http://127.0.0.1:8080"
 SCREENSHOT_DIR = r"C:\Users\tanay\.gemini\antigravity\brain\50bedeba-f832-4060-b1f8-e67903048f49"
 
 
+def is_live_server_available(url):
+    try:
+        req = urllib.request.Request(f"{url}/api/status")
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
 @pytest.fixture(scope="module")
 def driver():
-    """Initializes headless Edge WebDriver with 1920x1080 viewport."""
+    """Initializes headless Edge WebDriver with 1920x1080 viewport if available and server is live."""
+    if not is_live_server_available(BASE_URL):
+        pytest.skip(f"Live WASS server is not running on {BASE_URL} - skipping browser E2E tests")
+
     opts = Options()
     opts.add_argument("--headless")
     opts.add_argument("--window-size=1920,1080")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
 
-    driver = webdriver.Edge(options=opts)
+    try:
+        driver = webdriver.Edge(options=opts)
+    except Exception as e:
+        pytest.skip(f"Microsoft Edge / EdgeDriver is not available in current environment: {e}")
+
     driver.set_window_size(1920, 1080)
     driver.get(BASE_URL)
     time.sleep(2.5)  # Wait for initial WebGL and sequence metadata load

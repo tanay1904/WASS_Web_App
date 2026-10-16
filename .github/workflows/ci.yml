@@ -35,11 +35,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install -e .
 
     - name: Syntax & bytecode compilation check
       run: |
         python -m py_compile wass_webapp/analyze_wave_xyz.py wass_webapp/wass_video_pipeline.py wass_webapp/app.py
 
     - name: Run Pytest Test Suite
+      env:
+        PYTHONPATH: .
       run: |
         pytest -v --durations=10
