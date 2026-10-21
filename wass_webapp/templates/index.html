@@ -445,7 +445,7 @@
         <span class="text-secondary fw-normal fs-6">| 3D Sea Wave Reconstruction</span>
       </a>
       <span class="pill-badge text-success"><i class="fa-solid fa-circle me-1" style="font-size: 0.5rem;"></i> Optical Rig Active</span>
-      <span class="pill-badge">GoPro Binocular Rig (0.88m Baseline)</span>
+      <span class="pill-badge">GoPro Binocular Rig (2.00m Baseline)</span>
     </div>
 
     <!-- Right Controls: Theme Style Selector & Quick Navigation -->
@@ -649,7 +649,7 @@
                 <div class="row g-1 text-center small" style="font-size: 0.72rem;">
                   <div class="col-4 border-end" style="border-color: var(--border-subtle) !important;">
                     <span class="text-muted">Stereo Rig Baseline:</span>
-                    <span class="font-monospace text-info ms-1">0.88 meters (36 deg conv.)</span>
+                    <span class="font-monospace text-info ms-1">2.00 meters (36 deg conv.)</span>
                   </div>
                   <div class="col-4 border-end" style="border-color: var(--border-subtle) !important;">
                     <span class="text-muted">Regularized Grid:</span>
@@ -1424,9 +1424,9 @@
       flagMesh.position.set(0, 3.96, 1.45);
       boat.add(flagMesh);
 
-      // 7. Stereo Camera Rig Crossbar: B = 0.88m exactly at Y = 0.0m, Z = 1.80m
+      // 7. Stereo Camera Rig Crossbar: B = 2.00m exactly at Y = 0.0m, Z = 1.80m
       const barMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8, roughness: 0.2 });
-      const barGeom = new THREE.CylinderGeometry(0.025, 0.025, 0.88, 16);
+      const barGeom = new THREE.CylinderGeometry(0.025, 0.025, 2.00, 16);
       const barMesh = new THREE.Mesh(barGeom, barMat);
       barMesh.rotation.z = Math.PI / 2;
       barMesh.position.set(0, 0.0, 1.80);
@@ -1436,11 +1436,11 @@
       const strutGeom = new THREE.CylinderGeometry(0.02, 0.02, 1.30, 8);
       const strutL = new THREE.Mesh(strutGeom, barMat);
       strutL.rotation.x = Math.PI / 2;
-      strutL.position.set(-0.44, 0.0, 1.15);
+      strutL.position.set(-1.00, 0.0, 1.15);
       boat.add(strutL);
       const strutR = new THREE.Mesh(strutGeom, barMat);
       strutR.rotation.x = Math.PI / 2;
-      strutR.position.set(0.44, 0.0, 1.15);
+      strutR.position.set(1.00, 0.0, 1.15);
       boat.add(strutR);
 
       // Left Camera (Cam 0: GX010077)
@@ -1449,20 +1449,20 @@
       const camGeom = new THREE.BoxGeometry(0.12, 0.09, 0.08);
 
       const cam0Mesh = new THREE.Mesh(camGeom, camMat);
-      cam0Mesh.position.set(-0.44, 0.05, 1.80);
+      cam0Mesh.position.set(-1.00, 0.05, 1.80);
       boat.add(cam0Mesh);
       const lens0 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 16), lensMat);
       lens0.rotation.x = Math.PI / 2;
-      lens0.position.set(-0.44, 0.10, 1.80);
+      lens0.position.set(-1.00, 0.10, 1.80);
       boat.add(lens0);
 
       // Right Camera (Cam 1: GX011273)
       const cam1Mesh = new THREE.Mesh(camGeom, camMat);
-      cam1Mesh.position.set(0.44, 0.05, 1.80);
+      cam1Mesh.position.set(1.00, 0.05, 1.80);
       boat.add(cam1Mesh);
       const lens1 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.03, 16), lensMat);
       lens1.rotation.x = Math.PI / 2;
-      lens1.position.set(0.44, 0.10, 1.80);
+      lens1.position.set(1.00, 0.10, 1.80);
       boat.add(lens1);
 
       // Navigation lights on gunwales
@@ -1490,7 +1490,7 @@
       ctx.font = 'bold 15px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('WASS RIG (B=0.88m)', 120, 23);
+      ctx.fillText('WASS RIG (B=2.00m)', 120, 23);
       const tex = new THREE.CanvasTexture(c);
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.92 }));
       sp.scale.set(1.4, 0.28, 1.0);

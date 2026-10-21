@@ -226,7 +226,7 @@ def log(message):
     pipeline_state["logs"].append(message)
 
 
-def run_wass_stereo_frame(f0_raw, f1_raw, frame_idx, work_dir, binaries, vessel_m0=None, vessel_m1=None, baseline=0.88):
+def run_wass_stereo_frame(f0_raw, f1_raw, frame_idx, work_dir, binaries, vessel_m0=None, vessel_m1=None, baseline=2.0):
     wd = os.path.join(work_dir, "wass_frames", f"{frame_idx:06d}_wd")
     undist_dir = os.path.join(wd, "undistorted")
     os.makedirs(undist_dir, exist_ok=True)
@@ -396,7 +396,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
         X_grid, Y_grid = np.meshgrid(xs, ys)
 
         # Physical camera rig and ocean stereo geometry (Benetazzo / WASS formulation)
-        B = 0.88  # meters (physical crossbar stereo baseline)
+        B = 2.00  # meters (physical crossbar stereo baseline)
         f_4k = 1867.0  # pixels at 3840x2160 GoPro 4K
         f_scaled = f_4k * (w / 3840.0)  # ~ 466.75 pixels at 960x540
         H_cam = 4.76  # meters (camera altitude above mean sea level)

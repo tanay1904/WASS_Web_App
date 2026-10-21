@@ -19,7 +19,7 @@ except ImportError:
 
 def test_physical_stereo_scale_formulation():
     """Verify physical metric stereo scale formulation with physical baseline and height."""
-    B = 0.88          # Baseline in meters
+    B = 2.00          # Baseline in meters
     f_scaled = 466.75 # Scaled focal length in pixels
     H_cam = 4.76      # Camera altitude above MSL in meters
 

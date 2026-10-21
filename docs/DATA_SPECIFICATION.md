@@ -38,7 +38,7 @@ $$\begin{aligned}
 Wave elevation $\eta(X, Y)$ is extracted from dense optical disparity residuals using physical camera geometry and 3D slant range without heuristic clamping:
 
 ### 2.1 Metric Parameters
-* **Stereo Baseline ($B$):** $0.880\,\text{m}$ (rigid binocular crossbar mount).
+* **Stereo Baseline ($B$):** $2.000\,\text{m}$ (rigid binocular crossbar mount).
 * **Observer Camera Altitude ($H_{\text{cam}}$):** $4.760\,\text{m}$ above MSL.
 * **Focal Length ($f$):** $1867.0\,\text{px}$ at $4\text{K}$ acquisition ($466.75\,\text{px}$ at scaled $960 \times 540$ processing).
 * **3D Slant Range:**
