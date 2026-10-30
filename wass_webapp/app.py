@@ -629,12 +629,38 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, recons
                     pts.append([px, py, pz])
                     xyz_lines.append(f"{px} {py} {pz}\n")
 
-            # Save sequence artifacts cleanly
+            # Save video preview frame images within 300-frame circular FIFO window
             cv2.imwrite(os.path.join(seq_dir, f"video_frame_{i:03d}.jpg"), cv2.resize(dual_frame, (960, 270)))
             cv2.imwrite(os.path.join(seq_dir, f"video_frame_left_{i:03d}.jpg"), cv2.resize(f0_s, (640, 360)))
             cv2.imwrite(os.path.join(seq_dir, f"video_frame_right_{i:03d}.jpg"), cv2.resize(f1_s, (640, 360)))
             cv2.imwrite(os.path.join(seq_dir, f"video_frame_blend_{i:03d}.jpg"), cv2.resize(blend_frame, (640, 360)))
             cv2.imwrite(os.path.join(seq_dir, f"disparity_{i:03d}.png"), cv2.resize(disp_color, (640, 360)))
+
+            # Circular video buffer eviction:
+            # Video frame images maintain an active rolling window of 300 frames.
+            # Frames older than 300 are evicted to prevent disk exhaustion during 50,000-frame runs:
+            CIRCULAR_VIDEO_BUFFER_LIMIT = 300
+            if i >= CIRCULAR_VIDEO_BUFFER_LIMIT:
+                old_vid_idx = i - CIRCULAR_VIDEO_BUFFER_LIMIT
+                for vid_filename in [
+                    f"video_frame_{old_vid_idx:03d}.jpg",
+                    f"video_frame_left_{old_vid_idx:03d}.jpg",
+                    f"video_frame_right_{old_vid_idx:03d}.jpg",
+                    f"video_frame_blend_{old_vid_idx:03d}.jpg",
+                    f"disparity_{old_vid_idx:03d}.png"
+                ]:
+                    old_vid_path = os.path.join(seq_dir, vid_filename)
+                    if os.path.exists(old_vid_path):
+                        try:
+                            os.remove(old_vid_path)
+                        except OSError:
+                            pass
+
+            # BUT ALL WASS OUTPUT PLOTS, 3D POINT CLOUDS, TELEMETRY & CSVS MUST BE PERMANENTLY SAVED:
+            # - points_{i:03d}.json & .xyz
+            # - wave_analysis_{i:03d}.json (Hs, crest, trough, elevation probability histogram)
+            # - annotated_points_{i:03d}.csv (classified 3D ocean surface)
+            # - circular_arcs_points_{i:03d}.csv (1,610 circumference points at 1-degree resolution)
             with open(os.path.join(seq_dir, f"points_{i:03d}.json"), "w") as fp:
                 json.dump(pts, fp)
             xyz_path = os.path.join(seq_dir, f"points_{i:03d}.xyz")

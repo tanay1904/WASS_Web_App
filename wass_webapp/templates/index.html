@@ -831,7 +831,7 @@
                     </label>
                   </div>
                   <div class="stat-desc text-info" id="scopeExplainer">
-                    <i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Processes and plays through the <strong>full length of the video</strong> continuously through the 300-frame circular FIFO buffer. Oldest frames roll out smoothly as new frames stream in.
+                    <i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Video preview frames stream through a 300-frame circular FIFO buffer to prevent disk exhaustion, while <strong>all WASS 3D ocean meshes, wave telemetry, elevation distribution plots, and circumference CSVs are permanently saved</strong> for the entire video.
                   </div>
                 </div>
 
@@ -2618,7 +2618,7 @@
           scopeBadge.innerHTML = '<i class="fa-solid fa-infinity me-1"></i> Entire Video (Default)';
         }
         if (explainer) {
-          explainer.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Processes and plays through the <strong>full length of the video</strong> continuously through the 300-frame circular FIFO buffer. Oldest frames roll out smoothly as new frames stream in.';
+          explainer.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Video preview frames stream through a 300-frame circular FIFO buffer to prevent disk exhaustion, while <strong>all WASS 3D ocean meshes, wave telemetry, elevation distribution plots, and circumference CSVs are permanently saved</strong> for the entire video.';
         }
       } else {
         if (maxFramesInput) { maxFramesInput.disabled = false; if (maxFramesInput.value == 50000) maxFramesInput.value = 100; }
