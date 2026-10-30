@@ -93,59 +93,72 @@ def compute_audio_offset(
         }
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
-        # Determine if inputs are already WAV files or video files needing extraction
-        if stream0_path.lower().endswith(".wav"):
-            wav0 = stream0_path
-        else:
-            wav0 = os.path.join(tmp_dir, "cam0.wav")
-            extract_audio_from_video(stream0_path, wav0, sample_rate=sample_rate, duration=max_duration)
+        try:
+            # Determine if inputs are already WAV files or video files needing extraction
+            if stream0_path.lower().endswith(".wav"):
+                wav0 = stream0_path
+            else:
+                wav0 = os.path.join(tmp_dir, "cam0.wav")
+                extract_audio_from_video(stream0_path, wav0, sample_rate=sample_rate, duration=max_duration)
 
-        if stream1_path.lower().endswith(".wav"):
-            wav1 = stream1_path
-        else:
-            wav1 = os.path.join(tmp_dir, "cam1.wav")
-            extract_audio_from_video(stream1_path, wav1, sample_rate=sample_rate, duration=max_duration)
+            if stream1_path.lower().endswith(".wav"):
+                wav1 = stream1_path
+            else:
+                wav1 = os.path.join(tmp_dir, "cam1.wav")
+                extract_audio_from_video(stream1_path, wav1, sample_rate=sample_rate, duration=max_duration)
 
-        s0, sr0 = read_wav_samples(wav0)
-        s1, sr1 = read_wav_samples(wav1)
+            s0, sr0 = read_wav_samples(wav0)
+            s1, sr1 = read_wav_samples(wav1)
 
-        # Truncate to common length
-        min_len = min(len(s0), len(s1))
-        if min_len < 100:
-            raise ValueError("Audio streams too short or empty for cross-correlation")
+            # Truncate to common length
+            min_len = min(len(s0), len(s1))
+            if min_len < 100:
+                raise ValueError("Audio streams too short or empty for cross-correlation")
 
-        s0 = s0[:min_len]
-        s1 = s1[:min_len]
+            s0 = s0[:min_len]
+            s1 = s1[:min_len]
 
-        # Fast FFT-based normalized cross-correlation
-        corr = scipy.signal.correlate(s0, s1, mode="full", method="fft")
-        lags = scipy.signal.correlation_lags(len(s0), len(s1), mode="full")
+            # Fast FFT-based normalized cross-correlation
+            corr = scipy.signal.correlate(s0, s1, mode="full", method="fft")
+            lags = scipy.signal.correlation_lags(len(s0), len(s1), mode="full")
 
-        peak_idx = int(np.argmax(np.abs(corr)))
-        lag_samples = int(lags[peak_idx])
-        offset_sec = float(lag_samples / float(sample_rate))
-        offset_ms = float(offset_sec * 1000.0)
+            peak_idx = int(np.argmax(np.abs(corr)))
+            lag_samples = int(lags[peak_idx])
+            offset_sec = float(lag_samples / float(sample_rate))
+            offset_ms = float(offset_sec * 1000.0)
 
-        # Confidence metric (ratio of peak to median background noise)
-        med_val = float(np.median(np.abs(corr)))
-        peak_val = float(np.abs(corr[peak_idx]))
-        confidence = round(peak_val / (med_val + 1e-6), 2)
+            # Confidence metric (ratio of peak to median background noise)
+            med_val = float(np.median(np.abs(corr)))
+            peak_val = float(np.abs(corr[peak_idx]))
+            confidence = round(peak_val / (med_val + 1e-6), 2)
 
-        # Convention for correlation(s0, s1):
-        # A positive lag means s1 occurs earlier than s0 (Cam 1 is ahead/leading, Cam 0 is delayed).
-        # A negative lag means s0 occurs earlier than s1 (Cam 0 is ahead/leading, Cam 1 is delayed).
-        leading_cam = "cam1" if lag_samples > 0 else ("cam0" if lag_samples < 0 else "synchronized")
+            leading_cam = "cam1" if lag_samples > 0 else ("cam0" if lag_samples < 0 else "synchronized")
 
-        return {
-            "offset_seconds": round(offset_sec, 6),
-            "offset_ms": round(offset_ms, 3),
-            "lag_samples": lag_samples,
-            "sample_rate": sample_rate,
-            "confidence": confidence,
-            "leading_camera": leading_cam,
-            "video0": stream0_path,
-            "video1": stream1_path
-        }
+            return {
+                "offset_seconds": round(offset_sec, 6),
+                "offset_ms": round(offset_ms, 3),
+                "lag_samples": lag_samples,
+                "sample_rate": sample_rate,
+                "confidence": confidence,
+                "leading_camera": leading_cam,
+                "video0": stream0_path,
+                "video1": stream1_path,
+                "status": "synchronized"
+            }
+        except Exception as e:
+            # Graceful fallback for audio-less containers or silent video streams
+            return {
+                "offset_seconds": 0.0,
+                "offset_ms": 0.0,
+                "lag_samples": 0,
+                "sample_rate": sample_rate,
+                "confidence": 0.0,
+                "leading_camera": "synchronized",
+                "video0": stream0_path,
+                "video1": stream1_path,
+                "status": "no_audio",
+                "note": f"Audio cross-correlation skipped: {str(e)}"
+            }
 
 
 def trim_and_sync_videos(

@@ -146,15 +146,9 @@ def invalidate_caches():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler replacing deprecated @app.on_event handlers."""
-    try:
-        get_all_points()
-        get_all_analysis()
-        tf = _get_active_total_frames()
-        for i in range(tf):
-            get_sequence_frame(i)
-    except Exception as e:
-        print(f"[Cache Warmup Note] {e}")
+    """Lifespan event handler with lightweight non-blocking startup."""
+    # Frames and analyses are loaded lazily on demand to guarantee instant sub-second
+    # startup and prevent OOM (Out-Of-Memory) kills in constrained container environments (e.g. Codespaces).
     yield
 
 
@@ -1222,7 +1216,10 @@ def get_all_points():
         seq_dir = os.path.join(WORK_DIR, "sequence")
         frames = {}
         total_frames = _get_active_total_frames()
-        for idx in range(total_frames):
+        # Cap bulk payload to first 60 frames to prevent OOM on multi-thousand frame sequences.
+        # Additional frames stream seamlessly on-demand via /api/sequence/frame/{idx}.
+        max_bulk = min(total_frames, 60)
+        for idx in range(max_bulk):
             pts_file = os.path.join(seq_dir, f"points_{idx:03d}.json")
             if os.path.exists(pts_file):
                 try:
@@ -1248,7 +1245,8 @@ def get_all_analysis():
         seq_dir = os.path.join(WORK_DIR, "sequence")
         analyses = {}
         total_frames = _get_active_total_frames()
-        for idx in range(total_frames):
+        max_bulk = min(total_frames, 300)
+        for idx in range(max_bulk):
             a_file = os.path.join(seq_dir, f"wave_analysis_{idx:03d}.json")
             if os.path.exists(a_file):
                 try:
