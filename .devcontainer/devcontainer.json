@@ -25,7 +25,8 @@
       "label": "WASS 3D Wave Studio",
       "onAutoForward": "openBrowser",
       "protocol": "http",
-      "elevateIfNeeded": false
+      "elevateIfNeeded": false,
+      "visibility": "public"
     }
   },
   "waitFor": "postStartCommand",
