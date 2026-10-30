@@ -368,7 +368,7 @@ SAVE_FULL_MESH=true
     return disp_img, final_pts, plane_file if os.path.exists(plane_file) else None
 
 
-def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True):
+def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True, entire_video=True):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -380,11 +380,11 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
         binaries = None
         try:
             binaries = get_wass_binaries(auto_build=True)
-            log(f"[WASS Ingestion] Target: {pair_name.upper()} | Frames: {max_frames} | Stride: {step}")
+            log(f"[WASS Ingestion] Target: {pair_name.upper()} | Entire Video: {entire_video} | Frames: {max_frames} | Stride: {step}")
             log(f"[WASS Engine] Mode: Full WASS C++ Binaries (Prepare -> Match -> SBA -> Stereo)")
             log(f"  [Binaries] prepare={os.path.basename(binaries['wass_prepare'])}, match={os.path.basename(binaries['wass_match'])}, autocalib={os.path.basename(binaries['wass_autocalibrate'])}, stereo={os.path.basename(binaries['wass_stereo'])}")
         except Exception:
-            log(f"[WASS Ingestion] Target: {pair_name.upper()} | Frames: {max_frames} | Stride: {step}")
+            log(f"[WASS Ingestion] Target: {pair_name.upper()} | Entire Video: {entire_video} | Frames: {max_frames} | Stride: {step}")
             log(f"[WASS Engine] Mode: Cloud Optical Rig & Regularized Stereo Surface Engine")
 
         pipeline_state["current_stage"] = "1. WASS Stream Alignment & Homography"
@@ -525,7 +525,21 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
         prev_Z = None
         rendered_count = 0
 
-        for i in range(max_frames):
+        # Resolve total available video frames
+        total_vid_frames = 50000
+        if cap0 and cap0.isOpened():
+            detected = int(cap0.get(cv2.CAP_PROP_FRAME_COUNT))
+            if detected > 0:
+                total_vid_frames = max(1, detected - start_frame)
+
+        if entire_video:
+            target_frames = total_vid_frames
+            log(f"[WASS Ingestion] Mode: ENTIRE VIDEO CONTINUOUS STREAM (Processing full video length: {target_frames} frames from offset {start_frame})")
+        else:
+            target_frames = min(max_frames, total_vid_frames)
+            log(f"[WASS Ingestion] Mode: FIXED SLICE ({target_frames} frames from offset {start_frame})")
+
+        for i in range(target_frames):
             f0_s, f1_s = None, None
             if cap0 and cap1 and cap0.isOpened() and cap1.isOpened():
                 if step > 1 and i > 0:
@@ -635,10 +649,25 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
             export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
 
             rendered_count += 1
-            prog = int(20 + (i + 1) / max_frames * 75)
+            prog = int(20 + (i + 1) / max(1, target_frames) * 75)
             pipeline_state["progress"] = prog
-            pipeline_state["current_stage"] = f"Rendered frame {i+1}/{max_frames}"
-            log(f"  Frame {i:02d}/{max_frames-1}: Disparity computed -> 7,000 vertices -> Hs={analysis['significant_wave_height_Hs_m']:.2f}m, Distance mean={analysis['distance']['mean_m']:.1f}m")
+            pipeline_state["current_stage"] = f"Rendered frame {i+1}/{target_frames}"
+            log(f"  Frame {i:02d}/{target_frames-1}: Disparity computed -> 7,000 vertices -> Hs={analysis['significant_wave_height_Hs_m']:.2f}m, Distance mean={analysis['distance']['mean_m']:.1f}m")
+
+            # Progressive metadata save every 10 frames enables real-time stream playback
+            if (i + 1) % 10 == 0:
+                prog_meta = {
+                    "total_frames": rendered_count,
+                    "fps": 10,
+                    "grid_w": grid_w,
+                    "grid_h": grid_h,
+                    "pair": f"GoPro {pair_name.upper()}"
+                }
+                try:
+                    with open(os.path.join(seq_dir, "sequence_meta.json"), "w") as fm:
+                        json.dump(prog_meta, fm, indent=2)
+                except Exception:
+                    pass
 
         if cap0: cap0.release()
         if cap1: cap1.release()
@@ -669,7 +698,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
         log(f"\n[Error] Pipeline failed: {str(e)}")
 
 
-def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True):
+def run_pipeline_worker(video0, video1, video_sbs, max_frames=50000, step=1, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True, entire_video=True):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -727,7 +756,7 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=
                 video_sbs_path=video_sbs,
                 work_dir=work_dir,
                 step=step,
-                max_frames=max_frames,
+                max_frames=None if entire_video else max_frames,
                 start_frame=start_frame,
                 enable_audio_sync=enable_audio_sync
             )
@@ -864,7 +893,8 @@ async def start_pipeline(
     cam0_file: UploadFile = File(None),
     cam1_file: UploadFile = File(None),
     sbs_file: UploadFile = File(None),
-    max_frames: int = Form(5),
+    entire_video: bool = Form(True),
+    max_frames: int = Form(50000),
     start_frame: int = Form(0),
     step: int = Form(1),
     enable_audio_sync: bool = Form(True),
@@ -889,7 +919,7 @@ async def start_pipeline(
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 0
         pipeline_state["current_stage"] = "Initializing"
-        pipeline_state["logs"] = [f"[Pipeline] Initialized pipeline with source={video_source}, start_frame={start_frame}, audio_sync={enable_audio_sync}"]
+        pipeline_state["logs"] = [f"[Pipeline] Initialized pipeline with source={video_source}, entire_video={entire_video}, start_frame={start_frame}, audio_sync={enable_audio_sync}"]
         pipeline_state["reconstructed_frames"] = []
         invalidate_caches()
 
@@ -900,9 +930,10 @@ async def start_pipeline(
             max_frames=max_frames,
             step=step,
             start_frame=start_frame,
-            enable_audio_sync=enable_audio_sync
+            enable_audio_sync=enable_audio_sync,
+            entire_video=entire_video
         )
-        return JSONResponse({"status": "started", "source": video_source, "frames": max_frames, "start_frame": start_frame})
+        return JSONResponse({"status": "started", "source": video_source, "entire_video": entire_video, "frames": max_frames, "start_frame": start_frame})
 
     v0_path, v1_path, sbs_path = None, None, None
     use_sample = None
@@ -987,10 +1018,11 @@ async def start_pipeline(
         gopro_model=gopro_model,
         gopro_fov=gopro_fov,
         start_frame=start_frame,
-        enable_audio_sync=enable_audio_sync
+        enable_audio_sync=enable_audio_sync,
+        entire_video=entire_video
     )
 
-    return JSONResponse({"status": "started", "source": video_source, "frames": max_frames})
+    return JSONResponse({"status": "started", "source": video_source, "entire_video": entire_video, "frames": max_frames})
 
 
 @app.post("/api/sync/check")

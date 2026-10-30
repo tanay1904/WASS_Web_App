@@ -812,19 +812,45 @@
                   </div>
                 </div>
 
+                <!-- Video Processing Scope Selector -->
+                <div class="mb-3 p-2 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="stat-label mb-0"><i class="fa-solid fa-film me-1 text-info"></i> Video Processing Scope</label>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle" id="scopeBadge">
+                      <i class="fa-solid fa-infinity me-1"></i> Entire Video (Default)
+                    </span>
+                  </div>
+                  <div class="btn-group w-100 mb-2" role="group">
+                    <input type="radio" class="btn-check" name="scopeOption" id="scopeEntireVideo" value="entire" checked onchange="toggleScopeOption()">
+                    <label class="btn btn-outline-info py-2" for="scopeEntireVideo" style="font-size: 0.8rem;">
+                      <i class="fa-solid fa-infinity me-1"></i> Entire Video Length (Default)
+                    </label>
+                    <input type="radio" class="btn-check" name="scopeOption" id="scopeFixedSlice" value="slice" onchange="toggleScopeOption()">
+                    <label class="btn btn-outline-custom py-2" for="scopeFixedSlice" style="font-size: 0.8rem;">
+                      <i class="fa-solid fa-crop me-1"></i> Fixed Frame Slice (Offset & Count)
+                    </label>
+                  </div>
+                  <div class="stat-desc text-info" id="scopeExplainer">
+                    <i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Processes and plays through the <strong>full length of the video</strong> continuously through the 300-frame circular FIFO buffer. Oldest frames roll out smoothly as new frames stream in.
+                  </div>
+                </div>
+
                 <div class="row g-2 mb-3">
-                  <div class="col-4">
-                    <label class="form-label"><i class="fa-solid fa-play me-1 text-info"></i> Start Offset</label>
-                    <input type="number" class="form-control font-monospace text-center fw-bold" id="startFrame" value="0" min="0" max="50000" oninput="document.getElementById('startFrameSlider').value = this.value">
-                    <input type="range" class="form-range mt-1" id="startFrameSlider" min="0" max="1000" value="0" oninput="document.getElementById('startFrame').value = this.value">
-                    <div class="stat-desc">Start frame in video (e.g. 0, 150)</div>
+                  <div class="col-6">
+                    <label class="form-label d-flex justify-content-between">
+                      <span><i class="fa-solid fa-play me-1 text-info"></i> Start Offset Marker</span>
+                      <span class="badge bg-dark text-info" id="startFrameDisplay">Frame 0</span>
+                    </label>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="startFrame" value="0" min="0" max="50000" oninput="syncStartFrame(this.value)">
+                    <input type="range" class="form-range mt-2" id="startFrameSlider" min="0" max="5000" value="0" oninput="syncStartFrame(this.value)">
+                    <div class="stat-desc">Start playback/processing from any point in the video</div>
                   </div>
-                  <div class="col-4">
+                  <div class="col-3" id="maxFramesCol" style="opacity: 0.5;">
                     <label class="form-label"><i class="fa-solid fa-film me-1 text-primary"></i> Max Frames</label>
-                    <input type="number" class="form-control font-monospace text-center fw-bold" id="maxFrames" value="100" min="1" max="50000">
-                    <div class="stat-desc">Duration (e.g. 100, 500, 1000)</div>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="maxFrames" value="50000" min="1" max="50000" disabled>
+                    <div class="stat-desc" id="maxFramesDesc">Auto (Entire Video)</div>
                   </div>
-                  <div class="col-4">
+                  <div class="col-3">
                     <label class="form-label"><i class="fa-solid fa-forward-step me-1 text-success"></i> Step / Stride</label>
                     <input type="number" class="form-control font-monospace text-center fw-bold" id="frameStep" value="1" min="1" max="120">
                     <div class="stat-desc">1 = 30 FPS, 3 = 10 FPS</div>
@@ -2565,12 +2591,58 @@
       document.getElementById('sbsInputs').classList.toggle('d-none', src !== 'sbs');
     }
 
+    function syncStartFrame(val) {
+      const parsed = parseInt(val, 10) || 0;
+      const numInput = document.getElementById('startFrame');
+      const slider = document.getElementById('startFrameSlider');
+      const badge = document.getElementById('startFrameDisplay');
+      if (numInput && parseInt(numInput.value, 10) !== parsed) numInput.value = parsed;
+      if (slider && parseInt(slider.value, 10) !== parsed) slider.value = Math.min(slider.max, parsed);
+      if (badge) badge.innerText = `Frame ${parsed}`;
+    }
+
+    function toggleScopeOption() {
+      const isEntire = document.getElementById('scopeEntireVideo')?.checked;
+      const maxFramesInput = document.getElementById('maxFrames');
+      const maxFramesCol = document.getElementById('maxFramesCol');
+      const maxFramesDesc = document.getElementById('maxFramesDesc');
+      const scopeBadge = document.getElementById('scopeBadge');
+      const explainer = document.getElementById('scopeExplainer');
+
+      if (isEntire) {
+        if (maxFramesInput) { maxFramesInput.value = 50000; maxFramesInput.disabled = true; }
+        if (maxFramesCol) maxFramesCol.style.opacity = '0.5';
+        if (maxFramesDesc) maxFramesDesc.innerText = 'Auto (Entire Video)';
+        if (scopeBadge) {
+          scopeBadge.className = 'badge bg-success-subtle text-success border border-success-subtle';
+          scopeBadge.innerHTML = '<i class="fa-solid fa-infinity me-1"></i> Entire Video (Default)';
+        }
+        if (explainer) {
+          explainer.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Processes and plays through the <strong>full length of the video</strong> continuously through the 300-frame circular FIFO buffer. Oldest frames roll out smoothly as new frames stream in.';
+        }
+      } else {
+        if (maxFramesInput) { maxFramesInput.disabled = false; if (maxFramesInput.value == 50000) maxFramesInput.value = 100; }
+        if (maxFramesCol) maxFramesCol.style.opacity = '1.0';
+        if (maxFramesDesc) maxFramesDesc.innerText = 'Duration (e.g. 100, 500, 1000)';
+        if (scopeBadge) {
+          scopeBadge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle';
+          scopeBadge.innerHTML = '<i class="fa-solid fa-crop me-1"></i> Fixed Frame Slice';
+        }
+        if (explainer) {
+          explainer.innerHTML = '<i class="fa-solid fa-info-circle text-warning me-1"></i> Fixed Slice Mode: Processes only the specified number of frames starting at the selected offset marker.';
+        }
+      }
+    }
+
     async function startPipeline() {
       const form = new FormData();
       const source = document.getElementById('videoSource').value;
       form.append('video_source', source);
-      form.append('max_frames', document.getElementById('maxFrames').value);
-      form.append('start_frame', document.getElementById('startFrame') ? document.getElementById('startFrame').value : 0);
+
+      const isEntire = document.getElementById('scopeEntireVideo')?.checked;
+      form.append('entire_video', isEntire ? 'true' : 'false');
+      form.append('max_frames', isEntire ? 50000 : (parseInt(document.getElementById('maxFrames').value, 10) || 100));
+      form.append('start_frame', document.getElementById('startFrame') ? parseInt(document.getElementById('startFrame').value, 10) || 0 : 0);
       form.append('step', document.getElementById('frameStep').value);
       form.append('enable_audio_sync', document.getElementById('enableAudioSync') ? document.getElementById('enableAudioSync').checked : true);
       form.append('reconstruct_mode', document.getElementById('reconstructQuality').value);
@@ -2633,7 +2705,10 @@
             document.getElementById('systemStateBadge').innerHTML = '<i class="fa-solid fa-check text-success me-1"></i> Completed';
             document.getElementById('stageBadge').innerText = 'Completed';
             document.getElementById('completionBanner').classList.remove('d-none');
-            document.getElementById('completionText').innerText = `Reconstruction Complete: Processed ${document.getElementById('maxFrames').value} frames into 3D meshes & wave telemetry.`;
+            const isEntire = document.getElementById('scopeEntireVideo')?.checked;
+            document.getElementById('completionText').innerText = isEntire
+              ? `Reconstruction Complete: Processed entire video sequence into 3D meshes & wave telemetry.`
+              : `Reconstruction Complete: Processed ${document.getElementById('maxFrames').value} frames into 3D meshes & wave telemetry.`;
             
             // Invalidate caches and reload sequence bounds dynamically
             frameCache = {};

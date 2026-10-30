@@ -181,8 +181,10 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
     """Extract stereo frames from video input into WASS workdir."""
     if step is None or step < 1:
         raise ValueError(f"step must be a positive integer (>= 1), got {step}")
-    if max_frames is not None and max_frames < 1:
-        raise ValueError(f"max_frames must be a positive integer (>= 1), got {max_frames}")
+    if max_frames is not None and max_frames < 0:
+        raise ValueError(f"max_frames must be >= 0, got {max_frames}")
+    if max_frames == 0:
+        max_frames = None # 0 = Entire video length
     if start_frame is not None and start_frame < 0:
         raise ValueError(f"start_frame must be >= 0, got {start_frame}")
 
