@@ -28,6 +28,7 @@ env/
 # Large pre-compiled OS binaries & cloned upstream repository
 wass_dist/
 wass/
+wass_build_cache/
 
 # Root diagnostic, benchmark, and audit scripts (stay local)
 /test_*.py

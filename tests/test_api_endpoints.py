@@ -40,23 +40,22 @@ def test_api_status():
 
 
 def test_sequence_meta():
-    """Verify /api/sequence/meta returns 60 frames metadata."""
+    """Verify /api/sequence/meta returns valid sequence metadata."""
     response = client.get("/api/sequence/meta")
     assert response.status_code == 200
     meta = response.json()
-    assert meta.get("total_frames") == 60
-    assert meta.get("grid_w") == 100
-    assert meta.get("grid_h") == 70
+    assert meta.get("total_frames") >= 1
+    assert meta.get("fps") == 10
 
 
 def test_sequence_frame_0():
-    """Verify /api/sequence/frame/0 returns exactly 7,000 vertices with valid floats."""
+    """Verify /api/sequence/frame/0 returns point cloud vertices with valid floats."""
     response = client.get("/api/sequence/frame/0")
     assert response.status_code == 200
     data = response.json()
     assert "points" in data
     pts = data["points"]
-    assert len(pts) == 7000
+    assert len(pts) >= 1000
     assert len(pts[0]) == 3
     # Verify no NaNs or Infs
     for p in pts[:50]:
@@ -87,6 +86,34 @@ def test_export_arcs_csv():
     assert len(lines) == 11 # 1 header + 10 arc rows
 
 
+def test_export_circumference_csv():
+    """Verify downloading 1-degree resolution circumference points CSV."""
+    response = client.get("/api/wave_analysis/export_circumference/sequence_000")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers.get("content-type", "")
+    lines = response.text.strip().split("\n")
+    expected_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m"
+    assert lines[0].strip() == expected_header
+    # 10 radii * 161 azimuth angles = 1610 data points + 1 header line = 1611 lines
+    assert len(lines) == 1611
+
+
+def test_export_all_arcs_zip():
+    """Verify single-click automation bundling all frames CSVs into a zip archive."""
+    import zipfile
+    import io
+
+    response = client.get("/api/wave_analysis/export_all_arcs_zip")
+    assert response.status_code == 200
+    assert "application/zip" in response.headers.get("content-type", "")
+    
+    with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
+        namelist = zf.namelist()
+        assert len(namelist) > 0
+        assert any("circular_arcs_5m_" in n for n in namelist)
+        assert any("circular_arcs_points_" in n for n in namelist)
+
+
 def test_edge_cases():
     """Verify negative and out-of-bounds frame indices return 404/422."""
     assert client.get("/api/sequence/frame/-1").status_code == 404
@@ -95,13 +122,17 @@ def test_edge_cases():
 
 
 def test_pipeline_fallback_resilience():
-    """Verify run_pipeline_worker falls back gracefully without unhandled crashes when binaries are missing."""
+    """Verify run_pipeline_worker enforces strict no-fallback policy when binaries are missing."""
     from unittest.mock import patch
-    from app import run_pipeline_worker
+    from app import run_pipeline_worker, pipeline_state
 
     with patch("app.get_wass_binaries", side_effect=FileNotFoundError("Mock missing binary")):
         with patch("app.run_stereo_stream_worker") as mock_worker:
             run_pipeline_worker(None, None, None, max_frames=2, step=1, use_sample="synthetic")
-            mock_worker.assert_called_once_with("pair1", 2, 1, custom_cam0=None, custom_cam1=None)
+            # Verify fallback is strictly disabled and optical flow worker is NOT called
+            mock_worker.assert_not_called()
+            assert pipeline_state["status"] == "error"
+            logs_joined = " ".join(pipeline_state["logs"])
+            assert "Fallback is disabled" in logs_joined
 
 

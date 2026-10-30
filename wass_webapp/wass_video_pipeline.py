@@ -44,8 +44,9 @@ _ENV_DIST = os.getenv("WASS_BIN_DIR", "")
 WASS_BIN_DIR = _ENV_DIST if (_ENV_DIST and os.path.exists(_ENV_DIST)) else (_LOCAL_DIST if os.path.exists(_LOCAL_DIST) else _WEBAPP_DIST)
 
 
-def get_wass_binaries():
-    """Locate WASS binaries across Windows, Linux, and custom build environments."""
+def get_wass_binaries(auto_build=False):
+    """Locate WASS binaries across Windows, Linux, and custom build environments.
+    Optionally triggers auto-compilation via scripts/build_wass.sh if missing on Linux."""
     ext = ".exe" if sys.platform == "win32" else ""
     names = ["wass_prepare", "wass_match", "wass_autocalibrate", "wass_stereo"]
     binaries = {}
@@ -62,23 +63,56 @@ def get_wass_binaries():
         if in_path and os.path.exists(in_path):
             binaries[name] = in_path
             continue
-        # 3. Check linux /usr/local/bin or /opt/wass/bin
-        for sys_dir in ["/usr/local/bin", "/opt/wass/bin", "/usr/bin"]:
-            sys_cand = os.path.join(sys_dir, name)
+        # 3. Check linux standard binary directories
+        for sys_dir in ["/usr/local/bin", "/opt/wass/bin", "/usr/bin", os.path.expanduser("~/.local/bin")]:
+            sys_cand = os.path.join(sys_dir, bin_name)
             if os.path.exists(sys_cand):
                 binaries[name] = sys_cand
                 break
-        if name not in binaries:
-            raise FileNotFoundError(
-                f"WASS C++ binary '{name}' not found. "
-                "In cloud/Codespaces environments, use the Python Optical Rig mode or set WASS_BIN_DIR."
-            )
+
+    # If any binaries are missing and auto_build is requested on Linux, attempt build
+    # (Skip during pytest test runs or when explicit build isn't enabled)
+    is_pytest = bool(os.getenv("PYTEST_CURRENT_TEST"))
+    allow_build = auto_build and not is_pytest and (os.getenv("WASS_AUTO_BUILD") == "1" or os.path.exists("/.dockerenv") or os.path.exists("/workspaces"))
+
+    if len(binaries) < len(names) and allow_build and sys.platform.startswith("linux"):
+        build_script = os.path.join(PREDICT_DIR, "scripts", "build_wass.sh")
+        if os.path.exists(build_script) and shutil.which("cmake"):
+            print("[WASS Bootstrap] Missing native C++ binaries. Triggering automated build...")
+            try:
+                import subprocess
+                res = subprocess.run(["bash", build_script], cwd=PREDICT_DIR, capture_output=True, text=True, timeout=300)
+                if res.returncode == 0:
+                    print("[WASS Bootstrap] Automated build succeeded! Re-evaluating binary paths...")
+                    return get_wass_binaries(auto_build=False)
+                else:
+                    print(f"[WASS Bootstrap Note] Build script exited with code {res.returncode}:\n{res.stderr[:500]}")
+            except Exception as e:
+                print(f"[WASS Bootstrap Note] Build attempt: {e}")
+
+    missing = [name for name in names if name not in binaries]
+    if missing:
+        raise FileNotFoundError(
+            f"WASS C++ binaries missing ({', '.join(missing)}). "
+            "Run 'bash scripts/build_wass.sh' or build inside Docker/Codespaces."
+        )
     return binaries
 
 
-def generate_default_calibration(config_dir, width, height, f_factor=1.0):
-    """Generate default pinhole calibration XML files if none provided."""
+def generate_default_calibration(config_dir, width, height, f_factor=1.0, fov_mode="auto", model="auto", baseline_meters=2.0, video_path=None):
+    """Generate metric-accurate GoPro calibration XML files directly from optical specifications."""
     os.makedirs(config_dir, exist_ok=True)
+    try:
+        from wass_webapp.gopro_profile import write_wass_calibration_xmls, get_gopro_profile
+        files = write_wass_calibration_xmls(
+            config_dir, width, height, fov_mode=fov_mode, model=model, baseline_meters=baseline_meters, video_path=video_path
+        )
+        profile, m_key, f_key = get_gopro_profile(model, fov_mode, video_path)
+        print(f"[Config] Generated GoPro ({profile['name']} - {f_key.upper()}) calibration XMLs from sensor specifications.")
+        return files
+    except Exception as e:
+        print(f"[Config Note] Falling back to default pinhole calibration: {e}")
+
     fx = float(width) * f_factor
     fy = float(width) * f_factor
     cx = float(width) / 2.0
@@ -117,8 +151,8 @@ def generate_default_calibration(config_dir, width, height, f_factor=1.0):
                 f.write(distortion_tmpl)
 
 
-def copy_or_create_configs(binaries, config_dir, calib_src_dir=None, width=None, height=None):
-    """Copy calibration files or generate default configs."""
+def copy_or_create_configs(binaries, config_dir, calib_src_dir=None, width=None, height=None, fov_mode="auto", model="auto", video_path=None):
+    """Copy calibration files or generate default configs directly from GoPro specifications."""
     os.makedirs(config_dir, exist_ok=True)
 
     if calib_src_dir and os.path.exists(calib_src_dir):
@@ -127,7 +161,7 @@ def copy_or_create_configs(binaries, config_dir, calib_src_dir=None, width=None,
         print(f"[Config] Copied calibration files from {calib_src_dir}")
     else:
         if width and height:
-            generate_default_calibration(config_dir, width, height)
+            generate_default_calibration(config_dir, width, height, fov_mode=fov_mode, model=model, video_path=video_path)
             print(f"[Config] Generated default calibration for resolution {width}x{height}")
 
     # Generate config files if missing
@@ -143,12 +177,14 @@ def copy_or_create_configs(binaries, config_dir, calib_src_dir=None, width=None,
         subprocess.run([binaries["wass_prepare"], "--genconfig"], cwd=config_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_dir, step=1, max_frames=None):
+def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_dir, step=1, max_frames=None, start_frame=0, enable_audio_sync=True):
     """Extract stereo frames from video input into WASS workdir."""
     if step is None or step < 1:
         raise ValueError(f"step must be a positive integer (>= 1), got {step}")
     if max_frames is not None and max_frames < 1:
         raise ValueError(f"max_frames must be a positive integer (>= 1), got {max_frames}")
+    if start_frame is not None and start_frame < 0:
+        raise ValueError(f"start_frame must be >= 0, got {start_frame}")
 
     cam0_dir = os.path.join(work_dir, "input", "cam0")
     cam1_dir = os.path.join(work_dir, "input", "cam1")
@@ -164,6 +200,10 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
         if not cap.isOpened():
             raise RuntimeError(f"Failed to open video {video_sbs_path}")
 
+        if start_frame > 0:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+            print(f"[Video Feeder] Fast-forwarded to start frame {start_frame}")
+
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
         print(f"[Video Feeder] Total frames: {total_frames}, FPS: {fps:.1f}")
@@ -178,7 +218,7 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
                 im0 = frame[:, :half_w]
                 im1 = frame[:, half_w:]
 
-                ts_ms = int((frame_count / fps) * 1000.0)
+                ts_ms = int(((frame_count + start_frame) / fps) * 1000.0)
                 name0 = f"{saved_count:06d}_{ts_ms:013d}_01.png"
                 name1 = f"{saved_count:06d}_{ts_ms:013d}_02.png"
 
@@ -201,6 +241,32 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
             raise RuntimeError("Failed to open one or both video streams")
 
         fps = cap0.get(cv2.CAP_PROP_FPS) or 25.0
+
+        if start_frame > 0:
+            cap0.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+            cap1.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+            print(f"[Video Feeder] Fast-forwarded dual cameras to start frame {start_frame}")
+
+        # Sub-millisecond audio cross-correlation auto-sync
+        if enable_audio_sync:
+            try:
+                from wass_webapp.audio_sync import compute_audio_offset
+                sync_info = compute_audio_offset(video0_path, video1_path)
+                lag_sec = sync_info.get("offset_seconds", 0.0)
+                lag_frames = int(round(lag_sec * fps))
+                print(f"[Audio Sync] Sub-millisecond offset: {sync_info.get('offset_ms', 0.0):.2f} ms ({lag_frames} frames lag).")
+                if lag_frames > 0:
+                    print(f"[Audio Sync] Cam 0 is ahead by {lag_frames} frames. Advancing Cam 0 to synchronize...")
+                    for _ in range(lag_frames):
+                        cap0.grab()
+                elif lag_frames < 0:
+                    print(f"[Audio Sync] Cam 1 is ahead by {abs(lag_frames)} frames. Advancing Cam 1 to synchronize...")
+                    for _ in range(abs(lag_frames)):
+                        cap1.grab()
+            except Exception as se:
+                print(f"[Audio Sync Note] Auto-sync check skipped: {se}")
+        else:
+            print("[Audio Sync] Hydroacoustic audio sync is GUARDED OFF by user configuration.")
 
         while True:
             ret0, frame0 = cap0.read()
@@ -326,11 +392,129 @@ def run_wass_pipeline(work_dir, binaries, num_frames):
         
         print(f"  Frame {i:02d} reconstructed: mesh.ply={ply_exists}, mesh_cam.xyzC={xyz_exists}, disparity={disp_exists}")
 
+    # Format output workspaces into studio sequence artifacts if sequence dir exists or needed
+    seq_dir = os.path.join(work_dir, "sequence")
+    format_wass_workspaces_to_sequence(workspaces, seq_dir)
+
     print("\n=======================================================")
     print(" WASS Pipeline Reconstructed Successfully!")
     print(f" Outputs saved to: {output_dir}")
     print("=======================================================\n")
     return True
+
+
+def format_wass_workspaces_to_sequence(workspaces, seq_dir):
+    """
+    Translates raw native WASS C++ outputs (plane_refinement_inliers.xyz, plane.txt, disparity_final_scaled.png)
+    into Web Studio sequence artifacts (points_XXX.json, points_XXX.xyz, wave_analysis_XXX.json, sequence_meta.json).
+    Ensures 100% native C++ data is directly rendered in the Three.js 3D viewport and oceanographic dashboards.
+    """
+    os.makedirs(seq_dir, exist_ok=True)
+    try:
+        from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz, export_circular_arcs_circumference_csv
+    except ImportError:
+        from analyze_wave_xyz import analyze_xyz, export_annotated_xyz, export_circular_arcs_circumference_csv
+
+    import json
+    rendered_count = 0
+
+    for i, wd in enumerate(workspaces):
+        # 1. Locate 3D points
+        xyz_source = os.path.join(wd, "plane_refinement_inliers.xyz")
+        if not os.path.exists(xyz_source):
+            for alt in ["mesh_cam.xyzC", "mesh.ply"]:
+                cand = os.path.join(wd, alt)
+                if os.path.exists(cand):
+                    xyz_source = cand
+                    break
+
+        pts = []
+        if os.path.exists(xyz_source):
+            if xyz_source.endswith(".ply"):
+                try:
+                    with open(xyz_source, "r", encoding="utf-8", errors="ignore") as pf:
+                        in_header = True
+                        for line in pf:
+                            if in_header:
+                                if line.strip() == "end_header":
+                                    in_header = False
+                                continue
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                try:
+                                    pts.append([round(float(parts[0]), 4), round(float(parts[1]), 4), round(float(parts[2]), 4)])
+                                except (ValueError, OverflowError):
+                                    continue
+                except Exception:
+                    pass
+            else:
+                try:
+                    with open(xyz_source, "r", encoding="utf-8", errors="ignore") as f:
+                        for line in f:
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                try:
+                                    pts.append([round(float(parts[0]), 4), round(float(parts[1]), 4), round(float(parts[2]), 4)])
+                                except (ValueError, OverflowError):
+                                    continue
+                except Exception:
+                    pass
+
+        dest_xyz = os.path.join(seq_dir, f"points_{i:03d}.xyz")
+        dest_json = os.path.join(seq_dir, f"points_{i:03d}.json")
+
+        if pts:
+            # Subsample for WebGL 60fps browser rendering if cloud exceeds 25,000 points
+            json_pts = pts
+            if len(pts) > 25000:
+                indices = np.linspace(0, len(pts) - 1, 25000, dtype=int)
+                json_pts = [pts[idx] for idx in indices]
+
+            with open(dest_json, "w") as fj:
+                json.dump(json_pts, fj)
+            with open(dest_xyz, "w") as fx:
+                for p in pts:
+                    fx.write(f"{p[0]} {p[1]} {p[2]}\n")
+
+            plane_file = os.path.join(wd, "plane.txt")
+            analysis, pts_arr, dist_obs, h_sea = analyze_xyz(
+                dest_xyz, plane_path=plane_file if os.path.exists(plane_file) else None
+            )
+            with open(os.path.join(seq_dir, f"wave_analysis_{i:03d}.json"), "w") as fa:
+                json.dump(analysis, fa, indent=2)
+            export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"))
+            export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
+            rendered_count += 1
+
+        # 2. Images & Disparity maps
+        for cand in [os.path.join(wd, "00000000_s.png"), os.path.join(wd, "undistorted", "00000000.png")]:
+            if os.path.exists(cand):
+                shutil.copy2(cand, os.path.join(seq_dir, f"video_frame_left_{i:03d}.jpg"))
+                break
+        for cand in [os.path.join(wd, "00000001_s.png"), os.path.join(wd, "undistorted", "00000001.png")]:
+            if os.path.exists(cand):
+                shutil.copy2(cand, os.path.join(seq_dir, f"video_frame_right_{i:03d}.jpg"))
+                break
+        for cand in [os.path.join(wd, "disparity_final_scaled.png"), os.path.join(wd, "disparity_stereo_ouput.png")]:
+            if os.path.exists(cand):
+                shutil.copy2(cand, os.path.join(seq_dir, f"disparity_{i:03d}.png"))
+                break
+        stereo_cand = os.path.join(wd, "stereo.jpg")
+        if os.path.exists(stereo_cand):
+            shutil.copy2(stereo_cand, os.path.join(seq_dir, f"video_frame_blend_{i:03d}.jpg"))
+
+    meta = {
+        "total_frames": rendered_count,
+        "fps": 10,
+        "grid_w": 100,
+        "grid_h": 70,
+        "engine": "WASS Native C++ Pipeline (wass_prepare -> wass_match -> wass_autocalibrate -> wass_stereo)"
+    }
+    with open(os.path.join(seq_dir, "sequence_meta.json"), "w") as fm:
+        json.dump(meta, fm, indent=2)
+
+    return rendered_count
+
 
 
 def main():

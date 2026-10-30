@@ -130,14 +130,14 @@ def test_concurrency_cache_invalidation_race():
 # 2. BOUNDARY & MALICIOUS PAYLOAD BREAKER
 # ==============================================================================
 
-@pytest.mark.parametrize("max_frames", [0, -1, -9999, 501, 1000000])
+@pytest.mark.parametrize("max_frames", [0, -1, -9999, 50001, 1000000])
 def test_boundary_max_frames(max_frames):
-    """Verify max_frames outside [1, 500] is strictly rejected with HTTP 400."""
+    """Verify max_frames outside [1, 50000] is strictly rejected with HTTP 400."""
     with pipeline_lock:
         pipeline_state["status"] = "idle"
     resp = client.post("/api/run", data={"video_source": "pair1", "max_frames": max_frames, "step": 1})
     assert resp.status_code == 400
-    assert "max_frames must be between 1 and 500" in resp.json().get("error", "")
+    assert "max_frames must be between 1 and 50000" in resp.json().get("error", "")
 
 
 @pytest.mark.parametrize("step", [0, -1, 101, 99999])
@@ -451,7 +451,7 @@ def test_onedrive_failure_graceful_sequence_fallback(simulated_error):
     RuntimeError("WASS C++ binaries failed to execute on current platform architecture")
 ])
 def test_binary_absence_engine_delegation(binary_exception):
-    """Verify run_pipeline_worker seamlessly delegates to Python stereo engine when binaries are absent."""
+    """Verify run_pipeline_worker strictly rejects fallback and sets error status when binaries are absent."""
     with patch("app.get_wass_binaries", side_effect=binary_exception):
         with patch("app.run_stereo_stream_worker") as mock_stream_worker:
             with pipeline_lock:
@@ -465,9 +465,10 @@ def test_binary_absence_engine_delegation(binary_exception):
                 step=1
             )
 
-            # Check that notice was logged
+            # Check that notice was logged and fallback was rejected
             logs_joined = " ".join(pipeline_state["logs"])
             assert "WASS Engine Notice" in logs_joined
-            assert "Cloud Optical Stereo Reconstruction engine" in logs_joined
-            # Verify delegation
-            mock_stream_worker.assert_called_once_with("pair1", 2, 1, custom_cam0="fake0.mp4", custom_cam1="fake1.mp4")
+            assert "Fallback is disabled" in logs_joined
+            assert pipeline_state["status"] == "error"
+            # Verify fallback was NOT called
+            mock_stream_worker.assert_not_called()

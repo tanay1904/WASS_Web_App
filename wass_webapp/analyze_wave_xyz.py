@@ -391,6 +391,65 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path):
     print(f"Exported annotated dataset to {out_csv_path}")
 
 
+def export_circular_arcs_circumference_csv(
+    pts,
+    height_sea_level,
+    out_csv_path,
+    frame_idx=0,
+    arc_radii=None,
+    azimuth_step_deg=1.0
+):
+    """
+    Exports exact wave height for all points along the circumference of the circular arcs
+    centered at the research vessel mast origin (0, 0, 0).
+    Columns: frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m
+    """
+    if arc_radii is None:
+        arc_radii = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0]
+
+    out_dir = os.path.dirname(os.path.abspath(out_csv_path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+
+    header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m\n"
+    pts_arr = np.atleast_2d(pts) if (hasattr(pts, 'size') and pts.size > 0) else np.empty((0, 3))
+
+    if len(pts_arr) < 3 or len(height_sea_level) < 3:
+        with open(out_csv_path, "w", encoding="utf-8") as f:
+            f.write(header)
+        return header
+
+    azimuths = np.arange(-80.0, 80.0 + 0.1, azimuth_step_deg)
+    query_xy = []
+    meta = []
+    for r in arc_radii:
+        for az in azimuths:
+            rad = np.radians(az)
+            px = float(r * np.sin(rad))
+            py = float(r * np.cos(rad))
+            query_xy.append((px, py))
+            meta.append((frame_idx, r, round(float(az), 2), round(px, 4), round(py, 4), r))
+
+    query_xy = np.array(query_xy)
+    try:
+        from scipy.interpolate import griddata
+        interp_linear = griddata((pts_arr[:, 0], pts_arr[:, 1]), height_sea_level, query_xy, method='linear')
+        interp_nearest = griddata((pts_arr[:, 0], pts_arr[:, 1]), height_sea_level, query_xy, method='nearest')
+        interp_h = np.where(np.isnan(interp_linear), interp_nearest, interp_linear)
+    except Exception:
+        interp_h = np.zeros(len(query_xy))
+
+    lines = [header]
+    for idx_pt, (f_i, r_val, az_val, px_val, py_val, d_val) in enumerate(meta):
+        h_val = round(float(interp_h[idx_pt]), 4)
+        lines.append(f"{f_i},{r_val:.1f},{az_val:.2f},{px_val:.4f},{py_val:.4f},{h_val:.4f},{d_val:.1f}\n")
+
+    csv_data = "".join(lines)
+    with open(out_csv_path, "w", encoding="utf-8") as f:
+        f.write(csv_data)
+    return csv_data
+
+
 if __name__ == "__main__":
     import argparse
 

@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  wass-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wass-web-studio:latest
+    container_name: wass_web_studio
+    ports:
+      - "8080:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+    volumes:
+      - ./wass_webapp/workspace:/app/wass_webapp/workspace
+      - ./wass_webapp/uploads:/app/wass_webapp/uploads
+    restart: unless-stopped

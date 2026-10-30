@@ -560,8 +560,11 @@
                     <span class="small text-muted" style="font-size: 0.72rem;">Rate:</span>
                     <select class="form-select form-select-sm w-auto py-0 px-2" style="font-size: 0.72rem;" id="fpsSelect" onchange="changeSpeed()">
                       <option value="5">5 FPS</option>
-                      <option value="10" selected>10 FPS</option>
+                      <option value="10">10 FPS</option>
                       <option value="15">15 FPS</option>
+                      <option value="24">24 FPS</option>
+                      <option value="30" selected>30 FPS</option>
+                      <option value="60">60 FPS (Native)</option>
                     </select>
                   </div>
                 </div>
@@ -728,9 +731,17 @@
               <div class="d-flex flex-column flex-grow-1 overflow-hidden">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <div class="stat-label mb-0"><i class="fa-solid fa-bullseye me-1 text-info"></i> 5m Circular Arcs Around Boat (WASS Logs)</div>
-                  <button type="button" class="btn btn-outline-custom py-0 px-2" style="font-size: 0.65rem;" onclick="exportCurrentArcsCsv()" title="Export 5m Circular Arcs CSV">
-                    <i class="fa-solid fa-download me-1 text-info"></i> Export Arcs CSV
-                  </button>
+                  <div class="d-flex gap-1">
+                    <button type="button" class="btn btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" onclick="exportCurrentArcsCircumferenceCsv()" title="Export Wave Height of All Circumference Points">
+                      <i class="fa-solid fa-circle-nodes me-1 text-warning"></i> Circumference CSV
+                    </button>
+                    <button type="button" class="btn btn-outline-info py-0 px-2" style="font-size: 0.65rem;" onclick="exportAllArcsCsvZip()" title="Single-Click: Generate & Download All Frames CSVs (ZIP)">
+                      <i class="fa-solid fa-file-zipper me-1 text-info"></i> All Frames (ZIP)
+                    </button>
+                    <button type="button" class="btn btn-outline-custom py-0 px-2" style="font-size: 0.65rem;" onclick="exportCurrentArcsCsv()" title="Export 5m Circular Arcs Summary CSV">
+                      <i class="fa-solid fa-download me-1 text-muted"></i> Summary
+                    </button>
+                  </div>
                 </div>
                 <div class="table-container-scroll flex-grow-1">
                   <table class="table-dark-custom text-center align-middle mb-0" id="tableDistanceProfile">
@@ -802,15 +813,58 @@
                 </div>
 
                 <div class="row g-2 mb-3">
-                  <div class="col-6">
-                    <label class="form-label"><i class="fa-solid fa-film me-1"></i> Frames to Reconstruct</label>
+                  <div class="col-4">
+                    <label class="form-label"><i class="fa-solid fa-play me-1 text-info"></i> Start Offset</label>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="startFrame" value="0" min="0" max="50000" oninput="document.getElementById('startFrameSlider').value = this.value">
+                    <input type="range" class="form-range mt-1" id="startFrameSlider" min="0" max="1000" value="0" oninput="document.getElementById('startFrame').value = this.value">
+                    <div class="stat-desc">Start frame in video (e.g. 0, 150)</div>
+                  </div>
+                  <div class="col-4">
+                    <label class="form-label"><i class="fa-solid fa-film me-1 text-primary"></i> Max Frames</label>
                     <input type="number" class="form-control font-monospace text-center fw-bold" id="maxFrames" value="100" min="1" max="50000">
-                    <div class="stat-desc">Target sequence duration (e.g. 100, 500, 1000)</div>
+                    <div class="stat-desc">Duration (e.g. 100, 500, 1000)</div>
+                  </div>
+                  <div class="col-4">
+                    <label class="form-label"><i class="fa-solid fa-forward-step me-1 text-success"></i> Step / Stride</label>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="frameStep" value="1" min="1" max="120">
+                    <div class="stat-desc">1 = 30 FPS, 3 = 10 FPS</div>
+                  </div>
+                </div>
+
+                <div class="mb-3 d-flex align-items-center justify-content-between p-2 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
+                  <div>
+                    <label class="form-check-label stat-label mb-0" for="enableAudioSync">
+                      <i class="fa-solid fa-microphone-lines text-warning me-1"></i> Hydroacoustic Audio Cross-Correlation Sync
+                    </label>
+                    <div class="stat-desc">Sub-millisecond inter-camera delay via wave bubble acoustics</div>
+                  </div>
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="enableAudioSync" checked style="cursor: pointer; transform: scale(1.2);">
+                  </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                  <div class="col-6">
+                    <label class="form-label"><i class="fa-solid fa-camera me-1"></i> GoPro Model</label>
+                    <select class="form-select" id="goproModel">
+                      <option value="auto" selected>Auto-Detect (Container / GPMF)</option>
+                      <option value="hero11_12_13">GoPro HERO 11/12/13 (1/1.9" 8:7)</option>
+                      <option value="hero9_10">GoPro HERO 9/10 (1/2.3" IMX677)</option>
+                      <option value="hero8">GoPro HERO 8 (1/2.3" Folding)</option>
+                      <option value="hero5_6_7">GoPro HERO 5/6/7 (1/2.3" IMX117)</option>
+                      <option value="max">GoPro MAX 360 (Dual Spherical)</option>
+                    </select>
                   </div>
                   <div class="col-6">
-                    <label class="form-label"><i class="fa-solid fa-forward-step me-1"></i> Frame Step / Stride</label>
-                    <input type="number" class="form-control font-monospace text-center fw-bold" id="frameStep" value="1" min="1" max="120">
-                    <div class="stat-desc">1 = 30 FPS, 3 = 10 FPS, 30 = 1 FPS</div>
+                    <label class="form-label"><i class="fa-solid fa-eye me-1"></i> Lens FOV Mode</label>
+                    <select class="form-select" id="goproFov">
+                      <option value="auto" selected>Auto-Detect (Video Tags)</option>
+                      <option value="wide">Wide (16mm Fisheye)</option>
+                      <option value="linear">Linear (19mm Dewarped)</option>
+                      <option value="superview">SuperView (15-16mm Stretch)</option>
+                      <option value="hyperview">HyperView (12mm Ultra-POV)</option>
+                      <option value="narrow">Narrow (27-34mm Crop)</option>
+                    </select>
                   </div>
                 </div>
 
@@ -973,6 +1027,30 @@
     let renderMode = 'surface'; // 'surface', 'wireframe', 'points'
     let frameCache = {};
     let analysisCache = {};
+    const MAX_FIFO_CACHE_SIZE = 300; // Sliding FIFO window prevents RAM bloat during long 50k frame runs
+
+    function putInFrameCache(idx, data) {
+      if (!data) return;
+      frameCache[idx] = data;
+      const keys = Object.keys(frameCache);
+      if (keys.length > MAX_FIFO_CACHE_SIZE) {
+        // Evict frame furthest from current playback position
+        let furthestKey = null;
+        let maxDist = -1;
+        for (const k of keys) {
+          const ki = parseInt(k, 10);
+          const dist = Math.abs(ki - currentFrame);
+          if (dist > maxDist) {
+            maxDist = dist;
+            furthestKey = k;
+          }
+        }
+        if (furthestKey !== null) {
+          delete frameCache[furthestKey];
+          delete analysisCache['frame_' + furthestKey];
+        }
+      }
+    }
     let isFrameLoading = false;
     let lastFrameLoadingStart = 0;
     let initialCameraFitted = false;
@@ -1715,22 +1793,29 @@
         badge.innerText = `Frame ${String(idx).padStart(2, '0')} / ${String(maxDisplay).padStart(2, '0')}`;
       }
       
-      const padIdx = String(idx).padStart(3, '0');
-      const leftPlayer = document.getElementById('liveVideoPlayerLeft');
-      if (leftPlayer) {
-        leftPlayer.dataset.hasFailed = '';
-        leftPlayer.src = `/workspace/sequence/video_frame_left_${padIdx}.jpg`;
-      }
-      const rightPlayer = document.getElementById('liveVideoPlayerRight');
-      if (rightPlayer) {
-        rightPlayer.dataset.hasFailed = '';
-        rightPlayer.src = `/workspace/sequence/video_frame_right_${padIdx}.jpg`;
-      }
-      updateSingleStreamSource(idx);
-      const dispPlayer = document.getElementById('liveDispPlayer');
-      if (dispPlayer) {
-        dispPlayer.dataset.hasFailed = '';
-        dispPlayer.src = `/workspace/sequence/disparity_${padIdx}.png`;
+      // Check if high FPS playback is active (>= 24 FPS) to decouple 2D DOM images from WebGL engine
+      const fps = parseInt(document.getElementById('fpsSelect')?.value || '10');
+      const isHighFps = isPlaying && fps >= 24;
+      const throttleStep = fps >= 60 ? 6 : (fps >= 30 ? 3 : (fps >= 24 ? 2 : 1));
+
+      if (!isHighFps || (idx % throttleStep === 0)) {
+        const padIdx = String(idx).padStart(3, '0');
+        const leftPlayer = document.getElementById('liveVideoPlayerLeft');
+        if (leftPlayer) {
+          leftPlayer.dataset.hasFailed = '';
+          leftPlayer.src = `/workspace/sequence/video_frame_left_${padIdx}.jpg`;
+        }
+        const rightPlayer = document.getElementById('liveVideoPlayerRight');
+        if (rightPlayer) {
+          rightPlayer.dataset.hasFailed = '';
+          rightPlayer.src = `/workspace/sequence/video_frame_right_${padIdx}.jpg`;
+        }
+        updateSingleStreamSource(idx);
+        const dispPlayer = document.getElementById('liveDispPlayer');
+        if (dispPlayer) {
+          dispPlayer.dataset.hasFailed = '';
+          dispPlayer.src = `/workspace/sequence/disparity_${padIdx}.png`;
+        }
       }
 
       // Render 3D points immediately if cached in RAM
@@ -1743,9 +1828,10 @@
           const res = await fetch(`/api/sequence/frame/${idx}`, { signal: controller.signal });
           clearTimeout(tId);
           if (res.ok) {
-            frameCache[idx] = await res.json();
-            if (frameCache[idx] && frameCache[idx].points) {
-              renderMesh(frameCache[idx].points);
+            const data = await res.json();
+            putInFrameCache(idx, data);
+            if (data && data.points) {
+              renderMesh(data.points);
             }
           }
         } catch (e) {
@@ -1754,10 +1840,14 @@
       }
 
       // Synchronously update wave analysis metrics & histogram for this frame
-      fetchWaveAnalysis('frame_' + idx);
+      if (!isHighFps || (idx % throttleStep === 0) || !analysisCache['frame_' + idx]) {
+        fetchWaveAnalysis('frame_' + idx);
+      } else if (analysisCache['frame_' + idx]) {
+        applyAnalysisData(analysisCache['frame_' + idx]);
+      }
 
-      // Asynchronously pre-fetch upcoming frames into RAM cache
-      prefetchNextFrames(idx, 6);
+      // Asynchronously pre-fetch upcoming frames into circular RAM cache
+      prefetchNextFrames(idx, 8);
     }
 
     function prefetchNextFrames(startIdx, count) {
@@ -1766,7 +1856,7 @@
         const f = (startIdx + i) % totalFrames;
         if (!frameCache[f]) {
           fetch(`/api/sequence/frame/${f}`).then(r => r.ok ? r.json() : null).then(d => {
-            if (d && d.points) frameCache[f] = d;
+            if (d && d.points) putInFrameCache(f, d);
           }).catch(()=>{});
         }
         if (!analysisCache['frame_' + f]) {
@@ -1949,8 +2039,10 @@
 
       if (!isPlaying || sessionId !== playbackSessionId) return;
 
+      const elapsed = Date.now() - lastFrameLoadingStart;
+      const targetDelay = Math.max(1, playbackSpeed - elapsed);
       if (playbackTimeout) clearTimeout(playbackTimeout);
-      playbackTimeout = setTimeout(() => playTick(sessionId), playbackSpeed);
+      playbackTimeout = setTimeout(() => playTick(sessionId), targetDelay);
     }
 
     function togglePlayback() {
@@ -2019,7 +2111,7 @@
         if (resP.ok) {
           const allP = await resP.json();
           for (const [k, pts] of Object.entries(allP)) {
-            frameCache[parseInt(k)] = { points: pts };
+            putInFrameCache(parseInt(k), { points: pts });
           }
           if (frameCache[currentFrame] && frameCache[currentFrame].points) {
             renderMesh(frameCache[currentFrame].points);
@@ -2278,6 +2370,56 @@
       }
     }
 
+    async function exportCurrentArcsCircumferenceCsv(targetOverride) {
+      let target = targetOverride || '';
+      if (!target) {
+        if (mode === 'sequence') {
+          target = 'sequence_' + String(currentFrame).padStart(3, '0');
+        } else {
+          target = document.getElementById('datasetSelector').value;
+        }
+      }
+
+      showToast(`Preparing Circumference Arcs CSV for ${target}...`, 'info');
+
+      try {
+        const res = await fetch(`/api/wave_analysis/export_circumference/${target}`);
+        if (!res.ok) {
+          let errMsg = `Circumference CSV not found for ${target}.`;
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.error) errMsg = errJson.error;
+          } catch(_) {}
+          showToast(errMsg, 'warning');
+          return;
+        }
+
+        const blob = await res.blob();
+        const disposition = res.headers.get('content-disposition');
+        let filename = `circular_arcs_points_${target}.csv`;
+        if (disposition && disposition.includes('filename=')) {
+          const match = disposition.match(/filename=["']?([^"']+)["']?/);
+          if (match && match[1]) filename = match[1];
+        }
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        showToast(`Successfully downloaded ${filename}`, 'success');
+      } catch (err) {
+        showToast(`Network error downloading Circumference CSV: ${err.message}`, 'danger');
+      }
+    }
+
+    function exportAllArcsCsvZip() {
+      showToast("Generating and bundling All Frames Wave & Arcs CSVs (ZIP)...", "info");
+      window.location.href = `/api/wave_analysis/export_all_arcs_zip`;
+    }
+
     function drawHistogram(dist) {
       const canvas = document.getElementById('elevationHistCanvas');
       if (!canvas) return;
@@ -2428,8 +2570,12 @@
       const source = document.getElementById('videoSource').value;
       form.append('video_source', source);
       form.append('max_frames', document.getElementById('maxFrames').value);
+      form.append('start_frame', document.getElementById('startFrame') ? document.getElementById('startFrame').value : 0);
       form.append('step', document.getElementById('frameStep').value);
+      form.append('enable_audio_sync', document.getElementById('enableAudioSync') ? document.getElementById('enableAudioSync').checked : true);
       form.append('reconstruct_mode', document.getElementById('reconstructQuality').value);
+      form.append('gopro_model', document.getElementById('goproModel') ? document.getElementById('goproModel').value : 'auto');
+      form.append('gopro_fov', document.getElementById('goproFov') ? document.getElementById('goproFov').value : 'auto');
 
       if (source === 'dual') {
         const c0 = document.getElementById('cam0File').files[0];

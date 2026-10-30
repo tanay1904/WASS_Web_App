@@ -6,6 +6,8 @@ import shutil
 import threading
 import subprocess
 import re
+import io
+import zipfile
 from pathlib import Path
 from contextlib import asynccontextmanager
 try:
@@ -95,7 +97,7 @@ async def save_upload_file(upload_file: UploadFile, dest_path: str, max_bytes: i
     try:
         with open(dest_path, "wb") as f:
             while True:
-                chunk = await upload_file.read(1024 * 1024)
+                chunk = await upload_file.read(30 * 1024 * 1024)  # 30 MB high-throughput chunking
                 if not chunk:
                     break
                 total_written += len(chunk)
@@ -215,10 +217,13 @@ if PREDICT_DIR not in sys.path:
     sys.path.insert(0, PREDICT_DIR)
 try:
     from wass_webapp.wass_video_pipeline import get_wass_binaries, copy_or_create_configs, extract_frames_from_videos
-    from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+    from wass_webapp.analyze_wave_xyz import analyze_xyz, export_annotated_xyz, export_circular_arcs_circumference_csv
 except ImportError:
     from wass_video_pipeline import get_wass_binaries, copy_or_create_configs, extract_frames_from_videos
-    from analyze_wave_xyz import analyze_xyz, export_annotated_xyz
+    from analyze_wave_xyz import analyze_xyz, export_annotated_xyz, export_circular_arcs_circumference_csv
+
+# Compilation / Runtime Guard: Hydroacoustic Audio-Based Frame Delay Synchronization
+ENABLE_AUDIO_SYNC = os.getenv("WASS_ENABLE_AUDIO_SYNC", "true").lower() == "true"
 
 
 def log(message):
@@ -363,7 +368,7 @@ SAVE_FULL_MESH=true
     return disp_img, final_pts, plane_file if os.path.exists(plane_file) else None
 
 
-def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None):
+def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -374,7 +379,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
     try:
         binaries = None
         try:
-            binaries = get_wass_binaries()
+            binaries = get_wass_binaries(auto_build=True)
             log(f"[WASS Ingestion] Target: {pair_name.upper()} | Frames: {max_frames} | Stride: {step}")
             log(f"[WASS Engine] Mode: Full WASS C++ Binaries (Prepare -> Match -> SBA -> Stereo)")
             log(f"  [Binaries] prepare={os.path.basename(binaries['wass_prepare'])}, match={os.path.basename(binaries['wass_match'])}, autocalib={os.path.basename(binaries['wass_autocalibrate'])}, stereo={os.path.basename(binaries['wass_stereo'])}")
@@ -508,6 +513,11 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
 
         if not cap0 or not cap1 or not cap0.isOpened() or not cap1.isOpened():
             log(f"[OneDrive Stream] Live direct stream capture unlinked; utilizing ingested GoPro stereo sequence frames from repository.")
+        else:
+            if start_frame > 0:
+                cap0.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+                cap1.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+                log(f"[Stream Seek] Video streams advanced to start frame offset {start_frame}.")
 
         seq_dir = os.path.join(WORK_DIR, "sequence")
         os.makedirs(seq_dir, exist_ok=True)
@@ -622,6 +632,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
             with open(os.path.join(seq_dir, f"wave_analysis_{i:03d}.json"), "w") as fa:
                 json.dump(analysis, fa, indent=2)
             export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"))
+            export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
 
             rendered_count += 1
             prog = int(20 + (i + 1) / max_frames * 75)
@@ -658,7 +669,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=10, step=1, reconstru
         log(f"\n[Error] Pipeline failed: {str(e)}")
 
 
-def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=None):
+def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -669,11 +680,14 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=
     try:
         binaries = None
         try:
-            binaries = get_wass_binaries()
+            binaries = get_wass_binaries(auto_build=True)
         except Exception as be:
+            with pipeline_lock:
+                pipeline_state["status"] = "error"
+                pipeline_state["current_stage"] = "Error"
             log(f"[WASS Engine Notice] WASS C++ binaries not installed on this OS: {be}")
-            log("[WASS Engine Notice] Seamlessly engaging Cloud Optical Stereo Reconstruction engine...")
-            return run_stereo_stream_worker("pair1", max_frames, step, custom_cam0=video0, custom_cam1=video1)
+            log("[WASS Engine Notice] Fallback is disabled by policy. Ensure WASS C++ is compiled via scripts/build_wass.sh or running in Docker.")
+            return
 
         work_dir = WORK_DIR
 
@@ -713,10 +727,20 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=
                 video_sbs_path=video_sbs,
                 work_dir=work_dir,
                 step=step,
-                max_frames=max_frames
+                max_frames=max_frames,
+                start_frame=start_frame,
+                enable_audio_sync=enable_audio_sync
             )
             config_dir = os.path.join(work_dir, "config")
-            copy_or_create_configs(binaries, config_dir, width=w, height=h)
+            copy_or_create_configs(
+                binaries,
+                config_dir,
+                width=w,
+                height=h,
+                fov_mode=gopro_fov,
+                model=gopro_model,
+                video_path=video0 or video_sbs
+            )
 
         pipeline_state["progress"] = 25
         log(f"[Info] Prepared {n_frames} stereo frame pairs ({w}x{h}).")
@@ -787,13 +811,20 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames, step, use_sample=
             log(f"  Frame {i:02d}: 3D Mesh & Disparity Generated.")
             pipeline_state["progress"] = 75 + int((i + 1) / len(workspaces) * 25)
 
+        # 5. Format native WASS C++ outputs into studio sequence artifacts
+        log("[Format] Translating native WASS C++ point clouds and disparity maps to sequence artifacts...")
+        seq_dir = os.path.join(work_dir, "sequence")
+        from wass_webapp.wass_video_pipeline import format_wass_workspaces_to_sequence
+        rendered_count = format_wass_workspaces_to_sequence(workspaces, seq_dir)
+        log(f"  -> Successfully formatted {rendered_count} native WASS frames into 3D point clouds and telemetry.")
+
         invalidate_caches()
         with pipeline_lock:
             pipeline_state["status"] = "completed"
             pipeline_state["progress"] = 100
             pipeline_state["current_stage"] = "Completed"
             pipeline_state["reconstructed_frames"] = [os.path.basename(w) for w in workspaces]
-        log("\n[Success] All 3D Sea Wave Reconstruction Stages Completed Successfully!")
+        log("\n[Success] All 3D Sea Wave Reconstruction Stages Completed Successfully on Native WASS C++!")
 
     except Exception as e:
         with pipeline_lock:
@@ -834,13 +865,20 @@ async def start_pipeline(
     cam1_file: UploadFile = File(None),
     sbs_file: UploadFile = File(None),
     max_frames: int = Form(5),
-    step: int = Form(1)
+    start_frame: int = Form(0),
+    step: int = Form(1),
+    enable_audio_sync: bool = Form(True),
+    gopro_model: str = Form("auto"),
+    gopro_fov: str = Form("auto")
 ):
     if video_source not in ["pair1", "pair2", "sample", "dual", "sbs"]:
         return JSONResponse({"error": f"Invalid video_source '{video_source}'"}, status_code=400)
 
-    if max_frames < 1 or max_frames > 500:
-        return JSONResponse({"error": "max_frames must be between 1 and 500"}, status_code=400)
+    if max_frames < 1 or max_frames > 50000:
+        return JSONResponse({"error": "max_frames must be between 1 and 50000"}, status_code=400)
+
+    if start_frame < 0 or start_frame > 50000:
+        return JSONResponse({"error": "start_frame must be between 0 and 50000"}, status_code=400)
 
     if step < 1 or step > 100:
         return JSONResponse({"error": "step must be between 1 and 100"}, status_code=400)
@@ -851,7 +889,7 @@ async def start_pipeline(
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 0
         pipeline_state["current_stage"] = "Initializing"
-        pipeline_state["logs"] = [f"[Pipeline] Initialized pipeline with source={video_source}"]
+        pipeline_state["logs"] = [f"[Pipeline] Initialized pipeline with source={video_source}, start_frame={start_frame}, audio_sync={enable_audio_sync}"]
         pipeline_state["reconstructed_frames"] = []
         invalidate_caches()
 
@@ -860,9 +898,11 @@ async def start_pipeline(
             run_stereo_stream_worker,
             pair_name=video_source,
             max_frames=max_frames,
-            step=step
+            step=step,
+            start_frame=start_frame,
+            enable_audio_sync=enable_audio_sync
         )
-        return JSONResponse({"status": "started", "source": video_source, "frames": max_frames})
+        return JSONResponse({"status": "started", "source": video_source, "frames": max_frames, "start_frame": start_frame})
 
     v0_path, v1_path, sbs_path = None, None, None
     use_sample = None
@@ -943,10 +983,73 @@ async def start_pipeline(
         video_sbs=sbs_path,
         max_frames=max_frames,
         step=step,
-        use_sample=use_sample
+        use_sample=use_sample,
+        gopro_model=gopro_model,
+        gopro_fov=gopro_fov,
+        start_frame=start_frame,
+        enable_audio_sync=enable_audio_sync
     )
 
     return JSONResponse({"status": "started", "source": video_source, "frames": max_frames})
+
+
+@app.post("/api/sync/check")
+async def check_audio_sync(
+    cam0_file: UploadFile = File(None),
+    cam1_file: UploadFile = File(None),
+    sample_rate: int = Form(48000),
+    max_duration: float = Form(30.0)
+):
+    """
+    Sub-millisecond audio cross-correlation video synchronization endpoint.
+    Uploads dual video or audio snippets and detects temporal lag.
+    """
+    if not cam0_file or not cam1_file:
+        return JSONResponse({"error": "Both cam0_file and cam1_file are required"}, status_code=400)
+
+    safe_c0 = sanitize_filename(cam0_file.filename)
+    safe_c1 = sanitize_filename(cam1_file.filename)
+    ext0 = Path(safe_c0).suffix.lower()
+    ext1 = Path(safe_c1).suffix.lower()
+
+    allowed = ALLOWED_VIDEO_EXTENSIONS | {".wav", ".mp3", ".aac", ".m4a"}
+    if ext0 not in allowed or ext1 not in allowed:
+        return JSONResponse(
+            {"error": f"Invalid audio/video file format. Allowed: {', '.join(sorted(allowed))}"},
+            status_code=400
+        )
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    v0_path = os.path.join(UPLOAD_DIR, "sync_c0_" + safe_c0)
+    v1_path = os.path.join(UPLOAD_DIR, "sync_c1_" + safe_c1)
+
+    try:
+        await save_upload_file(cam0_file, v0_path)
+        await save_upload_file(cam1_file, v1_path)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to save upload files: {str(e)}"}, status_code=400)
+
+    try:
+        try:
+            from wass_webapp.audio_sync import compute_audio_offset
+        except ImportError:
+            from audio_sync import compute_audio_offset
+
+        res = compute_audio_offset(v0_path, v1_path, sample_rate=sample_rate, max_duration=max_duration)
+        lag_sec = res.get("offset_seconds", 0.0)
+        res["lag_frames_25fps"] = round(lag_sec * 25.0, 2)
+        res["lag_frames_30fps"] = round(lag_sec * 30.0, 2)
+        res["lag_frames_60fps"] = round(lag_sec * 60.0, 2)
+        return JSONResponse(res)
+    except Exception as e:
+        return JSONResponse({"error": f"Audio synchronization computation failed: {str(e)}"}, status_code=500)
+    finally:
+        for p in [v0_path, v1_path]:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
 
 
 @app.get("/api/pointcloud/{frame_name:path}")
@@ -1163,6 +1266,71 @@ def get_sequence_frame(idx: int, request: Request = None):
     return Response(content=encoded, media_type="application/json")
 
 
+@app.get("/api/wave_analysis/export_all_arcs_zip")
+def export_all_arcs_zip():
+    """
+    Single-click automation: generates and bundles all circular_arcs_points_*.csv,
+    annotated_points_*.csv, and circular_arcs_5m_*.csv for all frames into a single downloadable ZIP archive.
+    """
+    total_frames = _get_active_total_frames()
+    if total_frames <= 0:
+        return JSONResponse({"error": "No frames found in active sequence"}, status_code=404)
+
+    seq_dir = os.path.join(WORK_DIR, "sequence")
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for i in range(total_frames):
+            # 1. Circumference points CSV (1-deg resolution, 1610 points)
+            arc_csv = os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv")
+            if not os.path.exists(arc_csv):
+                xyz_path = os.path.join(seq_dir, f"points_{i:03d}.xyz")
+                if os.path.exists(xyz_path):
+                    try:
+                        _, pts_arr, _, h_sea = analyze_xyz(xyz_path)
+                        export_circular_arcs_circumference_csv(pts_arr, h_sea, arc_csv, frame_idx=i)
+                    except Exception:
+                        pass
+            if os.path.exists(arc_csv):
+                zip_file.write(arc_csv, arcname=f"circular_arcs_points_frame_{i:03d}.csv")
+
+            # 2. Classified annotated points CSV
+            ann_csv = os.path.join(seq_dir, f"annotated_points_{i:03d}.csv")
+            if os.path.exists(ann_csv):
+                zip_file.write(ann_csv, arcname=f"annotated_points_frame_{i:03d}.csv")
+
+            # 3. 5m Circular Arcs Summary CSV
+            analysis_json = os.path.join(seq_dir, f"wave_analysis_{i:03d}.json")
+            if os.path.exists(analysis_json):
+                try:
+                    with open(analysis_json, "r") as fa:
+                        data = json.load(fa)
+                    arcs = data.get("circular_arcs_5m", [])
+                    if arcs:
+                        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
+                        rows = [header]
+                        for a in arcs:
+                            if not isinstance(a, dict):
+                                continue
+                            az_min = float(a.get("azimuth_min_deg") or 0.0)
+                            az_max = float(a.get("azimuth_max_deg") or 0.0)
+                            az_span = round(float(az_max - az_min), 1)
+                            r_band = str(a.get("band_m", ""))
+                            hs_val = float(a.get("significant_height_Hs_m", a.get("Hs_m", 0.0)) or 0.0)
+                            rows.append(f"{a.get('radius_m', 0.0)},{r_band},{a.get('point_count', 0)},{a.get('mean_elevation_m', 0.0)},{a.get('crest_m', 0.0)},{a.get('trough_m', 0.0)},{a.get('amplitude_m', 0.0)},{hs_val},{a.get('std_elevation_m', 0.0)},{az_min},{az_max},{az_span}\r\n")
+                        zip_file.writestr(f"circular_arcs_5m_frame_{i:03d}.csv", "".join(rows))
+                except Exception:
+                    pass
+
+    zip_buffer.seek(0)
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="all_frames_circular_arcs_points.zip"'
+        }
+    )
+
+
 @app.get("/api/wave_analysis/{target}")
 def get_wave_analysis(target: str):
     """
@@ -1358,6 +1526,55 @@ def export_circular_arcs_csv(target: str):
             "Content-Disposition": f'attachment; filename="{export_name}"'
         }
     )
+
+
+@app.get("/api/wave_analysis/export_circumference/{target:path}")
+def export_circumference_csv(target: str):
+    """
+    Exports wave heights of all points in the circumference of the 5m circular arcs
+    (radii 5m to 50m sampled across the forward field of view).
+    Columns: frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m
+    """
+    if not is_safe_identifier(target):
+        return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+
+    idx = None
+    if target.startswith("frame_"):
+        val = target.replace("frame_", "")
+        if val.isdigit():
+            idx = int(val)
+    elif target.startswith("sequence_"):
+        val = target.replace("sequence_", "")
+        if val.isdigit():
+            idx = int(val)
+    elif target.isdigit():
+        idx = int(target)
+
+    total_frames = _get_active_total_frames()
+    if idx is not None:
+        if idx < 0 or idx >= total_frames:
+            return JSONResponse({"error": "Circumference points not found for " + target}, status_code=404)
+        circ_csv = os.path.join(WORK_DIR, "sequence", f"circular_arcs_points_{idx:03d}.csv")
+        export_name = f"circular_arcs_circumference_frame_{idx:03d}.csv"
+        if not os.path.exists(circ_csv):
+            xyz_path = os.path.join(WORK_DIR, "sequence", f"points_{idx:03d}.xyz")
+            if os.path.exists(xyz_path):
+                try:
+                    _, pts_arr, _, h_sea = analyze_xyz(xyz_path)
+                    export_circular_arcs_circumference_csv(pts_arr, h_sea, circ_csv, frame_idx=idx)
+                except Exception:
+                    pass
+        if os.path.exists(circ_csv):
+            with open(circ_csv, "r", encoding="utf-8") as f:
+                content = f.read()
+            return Response(
+                content=content,
+                media_type="text/csv",
+                headers={"Content-Disposition": f'attachment; filename="{export_name}"'}
+            )
+        return JSONResponse({"error": "Circumference points not found for " + target}, status_code=404)
+
+    return JSONResponse({"error": "Circumference points only available for sequence frames"}, status_code=400)
 
 
 def main():
