@@ -844,13 +844,13 @@
                       <span><i class="fa-solid fa-play me-1 text-info"></i> Start Offset Marker</span>
                       <span class="badge bg-dark text-info" id="startFrameDisplay">Frame 0</span>
                     </label>
-                    <input type="number" class="form-control font-monospace text-center fw-bold" id="startFrame" value="0" min="0" max="50000" oninput="syncStartFrame(this.value)">
-                    <input type="range" class="form-range mt-2" id="startFrameSlider" min="0" max="5000" value="0" oninput="syncStartFrame(this.value)">
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="startFrame" value="0" min="0" max="100000" oninput="syncStartFrame(this.value)">
+                    <input type="range" class="form-range mt-2" id="startFrameSlider" min="0" max="100000" value="0" oninput="syncStartFrame(this.value)">
                     <div class="stat-desc">Start playback/processing from any point in the video</div>
                   </div>
                   <div class="col-3" id="maxFramesCol" style="opacity: 0.5;">
                     <label class="form-label"><i class="fa-solid fa-film me-1 text-primary"></i> Max Frames</label>
-                    <input type="number" class="form-control font-monospace text-center fw-bold" id="maxFrames" value="50000" min="1" max="50000" disabled>
+                    <input type="number" class="form-control font-monospace text-center fw-bold" id="maxFrames" value="100000" min="1" max="100000" disabled>
                     <div class="stat-desc" id="maxFramesDesc">Auto (Entire Video)</div>
                   </div>
                   <div class="col-3">
@@ -2670,7 +2670,7 @@
       const explainer = document.getElementById('scopeExplainer');
 
       if (isEntire) {
-        if (maxFramesInput) { maxFramesInput.value = 50000; maxFramesInput.disabled = true; }
+        if (maxFramesInput) { maxFramesInput.value = 100000; maxFramesInput.disabled = true; }
         if (maxFramesCol) maxFramesCol.style.opacity = '0.5';
         if (maxFramesDesc) maxFramesDesc.innerText = 'Auto (Entire Video)';
         if (scopeBadge) {
@@ -2678,10 +2678,10 @@
           scopeBadge.innerHTML = '<i class="fa-solid fa-infinity me-1"></i> Entire Video (Default)';
         }
         if (explainer) {
-          explainer.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Video preview frames stream through a 300-frame circular FIFO buffer to prevent disk exhaustion, while <strong>all WASS 3D ocean meshes, wave telemetry, elevation distribution plots, and circumference CSVs are permanently saved</strong> for the entire video.';
+          explainer.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Processes and saves all video frames, 3D meshes, wave telemetry, elevation distribution plots, and circumference CSVs permanently on disk.';
         }
       } else {
-        if (maxFramesInput) { maxFramesInput.disabled = false; if (maxFramesInput.value == 50000) maxFramesInput.value = 100; }
+        if (maxFramesInput) { maxFramesInput.disabled = false; if (maxFramesInput.value == 100000) maxFramesInput.value = 100; }
         if (maxFramesCol) maxFramesCol.style.opacity = '1.0';
         if (maxFramesDesc) maxFramesDesc.innerText = 'Duration (e.g. 100, 500, 1000)';
         if (scopeBadge) {
@@ -2701,7 +2701,7 @@
 
       const isEntire = document.getElementById('scopeEntireVideo')?.checked;
       form.append('entire_video', isEntire ? 'true' : 'false');
-      form.append('max_frames', isEntire ? 50000 : (parseInt(document.getElementById('maxFrames').value, 10) || 100));
+      form.append('max_frames', isEntire ? 100000 : (parseInt(document.getElementById('maxFrames').value, 10) || 100));
       form.append('start_frame', document.getElementById('startFrame') ? parseInt(document.getElementById('startFrame').value, 10) || 0 : 0);
       form.append('step', document.getElementById('frameStep').value);
       form.append('enable_audio_sync', document.getElementById('enableAudioSync') ? document.getElementById('enableAudioSync').checked : true);

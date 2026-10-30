@@ -130,14 +130,14 @@ def test_concurrency_cache_invalidation_race():
 # 2. BOUNDARY & MALICIOUS PAYLOAD BREAKER
 # ==============================================================================
 
-@pytest.mark.parametrize("max_frames", [0, -1, -9999, 50001, 1000000])
+@pytest.mark.parametrize("max_frames", [0, -1, -9999, 100001, 1000000])
 def test_boundary_max_frames(max_frames):
-    """Verify max_frames outside [1, 50000] is strictly rejected with HTTP 400."""
+    """Verify max_frames outside [1, 100000] is strictly rejected with HTTP 400."""
     with pipeline_lock:
         pipeline_state["status"] = "idle"
     resp = client.post("/api/run", data={"video_source": "pair1", "max_frames": max_frames, "step": 1})
     assert resp.status_code == 400
-    assert "max_frames must be between 1 and 50000" in resp.json().get("error", "")
+    assert "max_frames must be between 1 and 100000" in resp.json().get("error", "")
 
 
 @pytest.mark.parametrize("step", [0, -1, 101, 99999])

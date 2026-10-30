@@ -362,7 +362,7 @@ SAVE_FULL_MESH=true
     return disp_img, final_pts, plane_file if os.path.exists(plane_file) else None
 
 
-def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True, entire_video=True, enable_circular_buffer=False):
+def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True, entire_video=True, enable_circular_buffer=False):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -520,7 +520,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, recons
         rendered_count = 0
 
         # Resolve total available video frames
-        total_vid_frames = 50000
+        total_vid_frames = 100000
         if cap0 and cap0.isOpened():
             detected = int(cap0.get(cv2.CAP_PROP_FRAME_COUNT))
             if detected > 0:
@@ -717,7 +717,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, recons
         log(f"\n[Error] Pipeline failed: {str(e)}")
 
 
-def run_pipeline_worker(video0, video1, video_sbs, max_frames=50000, step=1, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True, entire_video=True, enable_circular_buffer=False):
+def run_pipeline_worker(video0, video1, video_sbs, max_frames=100000, step=1, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True, entire_video=True, enable_circular_buffer=False):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -913,7 +913,7 @@ async def start_pipeline(
     cam1_file: UploadFile = File(None),
     sbs_file: UploadFile = File(None),
     entire_video: bool = Form(True),
-    max_frames: int = Form(50000),
+    max_frames: int = Form(100000),
     start_frame: int = Form(0),
     step: int = Form(1),
     enable_audio_sync: bool = Form(True),
@@ -924,11 +924,11 @@ async def start_pipeline(
     if video_source not in ["pair1", "pair2", "sample", "dual", "sbs"]:
         return JSONResponse({"error": f"Invalid video_source '{video_source}'"}, status_code=400)
 
-    if max_frames < 1 or max_frames > 50000:
-        return JSONResponse({"error": "max_frames must be between 1 and 50000"}, status_code=400)
+    if max_frames < 1 or max_frames > 100000:
+        return JSONResponse({"error": "max_frames must be between 1 and 100000"}, status_code=400)
 
-    if start_frame < 0 or start_frame > 50000:
-        return JSONResponse({"error": "start_frame must be between 0 and 50000"}, status_code=400)
+    if start_frame < 0 or start_frame > 100000:
+        return JSONResponse({"error": "start_frame must be between 0 and 100000"}, status_code=400)
 
     if step < 1 or step > 100:
         return JSONResponse({"error": "step must be between 1 and 100"}, status_code=400)
