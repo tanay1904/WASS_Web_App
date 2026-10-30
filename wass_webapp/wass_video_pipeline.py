@@ -405,7 +405,7 @@ def run_wass_pipeline(work_dir, binaries, num_frames):
     return True
 
 
-def format_wass_workspaces_to_sequence(workspaces, seq_dir):
+def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=False):
     """
     Translates raw native WASS C++ outputs (plane_refinement_inliers.xyz, plane.txt, disparity_final_scaled.png)
     into Web Studio sequence artifacts (points_XXX.json, points_XXX.xyz, wave_analysis_XXX.json, sequence_meta.json).
@@ -505,23 +505,24 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir):
         if os.path.exists(stereo_cand):
             shutil.copy2(stereo_cand, os.path.join(seq_dir, f"video_frame_blend_{i:03d}.jpg"))
 
-        # Circular video buffer eviction (maintains 300 active video frames while permanently saving all 3D wave telemetry & plots):
-        CIRCULAR_VIDEO_BUFFER_LIMIT = 300
-        if i >= CIRCULAR_VIDEO_BUFFER_LIMIT:
-            old_vid_idx = i - CIRCULAR_VIDEO_BUFFER_LIMIT
-            for vid_filename in [
-                f"video_frame_{old_vid_idx:03d}.jpg",
-                f"video_frame_left_{old_vid_idx:03d}.jpg",
-                f"video_frame_right_{old_vid_idx:03d}.jpg",
-                f"video_frame_blend_{old_vid_idx:03d}.jpg",
-                f"disparity_{old_vid_idx:03d}.png"
-            ]:
-                old_vid_path = os.path.join(seq_dir, vid_filename)
-                if os.path.exists(old_vid_path):
-                    try:
-                        os.remove(old_vid_path)
-                    except OSError:
-                        pass
+        # Optional Circular video buffer eviction (Default OFF: saves all frames on disk):
+        if enable_circular_buffer:
+            CIRCULAR_VIDEO_BUFFER_LIMIT = 300
+            if i >= CIRCULAR_VIDEO_BUFFER_LIMIT:
+                old_vid_idx = i - CIRCULAR_VIDEO_BUFFER_LIMIT
+                for vid_filename in [
+                    f"video_frame_{old_vid_idx:03d}.jpg",
+                    f"video_frame_left_{old_vid_idx:03d}.jpg",
+                    f"video_frame_right_{old_vid_idx:03d}.jpg",
+                    f"video_frame_blend_{old_vid_idx:03d}.jpg",
+                    f"disparity_{old_vid_idx:03d}.png"
+                ]:
+                    old_vid_path = os.path.join(seq_dir, vid_filename)
+                    if os.path.exists(old_vid_path):
+                        try:
+                            os.remove(old_vid_path)
+                        except OSError:
+                            pass
 
     meta = {
         "total_frames": rendered_count,

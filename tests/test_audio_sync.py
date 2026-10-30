@@ -110,3 +110,19 @@ def test_api_sync_check_endpoint():
     assert "confidence" in data
     assert data["confidence"] > 1.0
 
+
+def test_audio_sync_silent_or_audioless_fallback():
+    """Verify graceful fallback for empty or audio-less streams without throwing 500 error."""
+    with tempfile.NamedTemporaryFile(suffix=".wav") as f0, tempfile.NamedTemporaryFile(suffix=".wav") as f1:
+        # Create empty wav files
+        for filename in [f0.name, f1.name]:
+            with open(filename, "wb") as f:
+                f.write(b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80>\x00\x00\x00}\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00")
+
+        res = compute_audio_offset(f0.name, f1.name, sample_rate=16000)
+        assert res["status"] == "no_audio"
+        assert res["offset_seconds"] == 0.0
+        assert res["offset_ms"] == 0.0
+        assert "note" in res
+
+

@@ -575,6 +575,9 @@
                   <input type="range" class="form-range timeline-range" id="timelineSlider" min="0" max="149" value="0" oninput="onScrub(this.value)">
                   <small class="text-muted font-monospace" style="font-size: 0.7rem;" id="maxFrameLabel">149</small>
                 </div>
+                <div id="fifoPrunedBadge" class="text-center font-monospace mt-1 d-none" style="font-size: 0.65rem; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 4px; padding: 2px 4px;">
+                  <i class="fa-solid fa-arrows-rotate me-1"></i> [3D Mesh Active • 2D Video Frame Cycled out of FIFO Buffer]
+                </div>
               </div>
 
               <!-- Disparity Map Preview -->
@@ -735,7 +738,7 @@
                     <button type="button" class="btn btn-outline-warning py-0 px-2" style="font-size: 0.65rem;" onclick="exportCurrentArcsCircumferenceCsv()" title="Export Wave Height of All Circumference Points">
                       <i class="fa-solid fa-circle-nodes me-1 text-warning"></i> Circumference CSV
                     </button>
-                    <button type="button" class="btn btn-outline-info py-0 px-2" style="font-size: 0.65rem;" onclick="exportAllArcsCsvZip()" title="Single-Click: Generate & Download All Frames CSVs (ZIP)">
+                    <button type="button" class="btn btn-outline-info py-0 px-2" id="btnExportAllZip" style="font-size: 0.65rem;" onclick="exportAllArcsCsvZip()" title="Single-Click: Generate & Download All Frames CSVs (ZIP)">
                       <i class="fa-solid fa-file-zipper me-1 text-info"></i> All Frames (ZIP)
                     </button>
                     <button type="button" class="btn btn-outline-custom py-0 px-2" style="font-size: 0.65rem;" onclick="exportCurrentArcsCsv()" title="Export 5m Circular Arcs Summary CSV">
@@ -831,7 +834,7 @@
                     </label>
                   </div>
                   <div class="stat-desc text-info" id="scopeExplainer">
-                    <i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Video preview frames stream through a 300-frame circular FIFO buffer to prevent disk exhaustion, while <strong>all WASS 3D ocean meshes, wave telemetry, elevation distribution plots, and circumference CSVs are permanently saved</strong> for the entire video.
+                    <i class="fa-solid fa-circle-check text-success me-1"></i> Default Active: Processes and saves <strong>all video frames, 3D meshes, wave telemetry, elevation distribution plots, and circumference CSVs</strong> permanently on disk. Circular FIFO buffer is optional.
                   </div>
                 </div>
 
@@ -866,6 +869,18 @@
                   </div>
                   <div class="form-check form-switch m-0">
                     <input class="form-check-input" type="checkbox" id="enableAudioSync" checked style="cursor: pointer; transform: scale(1.2);">
+                  </div>
+                </div>
+
+                <div class="mb-3 d-flex align-items-center justify-content-between p-2 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
+                  <div>
+                    <label class="form-check-label stat-label mb-0" for="enableCircularBuffer">
+                      <i class="fa-solid fa-arrows-rotate text-info me-1"></i> Circular Rolling Buffer (FIFO 300)
+                    </label>
+                    <div class="stat-desc">Optional: Keep only 300 active preview frames to conserve disk during infinite live streams (Default: Off, saves all frames)</div>
+                  </div>
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="enableCircularBuffer" style="cursor: pointer; transform: scale(1.2);">
                   </div>
                 </div>
 
@@ -982,6 +997,11 @@
     function handleMediaError(img, type) {
       if (!img || img.dataset.hasFailed === 'true') return;
       img.dataset.hasFailed = 'true';
+      const isBufferPruned = (typeof totalFrames === 'number' && totalFrames > 300 && currentFrame < totalFrames - 300);
+      if (isBufferPruned) {
+        img.src = getFallbackImageSvg('Cycled out of FIFO Buffer', '3D Mesh Active • 2D Frame Pruned by Circular Buffer', 'camera');
+        return;
+      }
       if (type === 'disparity') {
         img.src = getFallbackImageSvg('Dense Disparity Unavailable', 'Depth map not generated for this frame', 'water');
       } else if (type === 'left') {
@@ -1819,6 +1839,16 @@
         badge.innerText = `Frame ${String(idx).padStart(2, '0')} / ${String(maxDisplay).padStart(2, '0')}`;
       }
       
+      const isBufferPruned = (typeof totalFrames === 'number' && totalFrames > 300 && idx < totalFrames - 300);
+      const prunedBadge = document.getElementById('fifoPrunedBadge');
+      if (prunedBadge) {
+        if (isBufferPruned) {
+          prunedBadge.classList.remove('d-none');
+        } else {
+          prunedBadge.classList.add('d-none');
+        }
+      }
+      
       // Check if high FPS playback is active (>= 24 FPS) to decouple 2D DOM images from WebGL engine
       const fps = parseInt(document.getElementById('fpsSelect')?.value || '10');
       const isHighFps = isPlaying && fps >= 24;
@@ -2441,9 +2471,39 @@
       }
     }
 
-    function exportAllArcsCsvZip() {
-      showToast("Generating and bundling All Frames Wave & Arcs CSVs (ZIP)...", "info");
-      window.location.href = `/api/wave_analysis/export_all_arcs_zip`;
+    async function exportAllArcsCsvZip() {
+      const btn = document.getElementById('btnExportAllZip');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1 text-info"></i> Packaging ZIP...';
+      }
+      showToast("Packaging All-Arcs ZIP bundle across all frames... Download will start automatically.", "info");
+
+      try {
+        const res = await fetch('/api/wave_analysis/export_all_arcs_zip');
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `wass_wave_analysis_all_arcs_${Date.now()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+        showToast("All-Arcs ZIP bundle downloaded successfully!", "success");
+      } catch (err) {
+        showToast(`Failed to generate ZIP archive: ${err.message}`, "danger");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
+      }
     }
 
     function drawHistogram(dist) {
@@ -2645,6 +2705,7 @@
       form.append('start_frame', document.getElementById('startFrame') ? parseInt(document.getElementById('startFrame').value, 10) || 0 : 0);
       form.append('step', document.getElementById('frameStep').value);
       form.append('enable_audio_sync', document.getElementById('enableAudioSync') ? document.getElementById('enableAudioSync').checked : true);
+      form.append('enable_circular_buffer', document.getElementById('enableCircularBuffer') ? document.getElementById('enableCircularBuffer').checked : false);
       form.append('reconstruct_mode', document.getElementById('reconstructQuality').value);
       form.append('gopro_model', document.getElementById('goproModel') ? document.getElementById('goproModel').value : 'auto');
       form.append('gopro_fov', document.getElementById('goproFov') ? document.getElementById('goproFov').value : 'auto');

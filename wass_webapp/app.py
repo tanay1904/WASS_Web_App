@@ -362,7 +362,7 @@ SAVE_FULL_MESH=true
     return disp_img, final_pts, plane_file if os.path.exists(plane_file) else None
 
 
-def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True, entire_video=True):
+def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, reconstruct_mode="wass_cpp", custom_cam0=None, custom_cam1=None, start_frame=0, enable_audio_sync=True, entire_video=True, enable_circular_buffer=False):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -630,25 +630,24 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, recons
             cv2.imwrite(os.path.join(seq_dir, f"video_frame_blend_{i:03d}.jpg"), cv2.resize(blend_frame, (640, 360)))
             cv2.imwrite(os.path.join(seq_dir, f"disparity_{i:03d}.png"), cv2.resize(disp_color, (640, 360)))
 
-            # Circular video buffer eviction:
-            # Video frame images maintain an active rolling window of 300 frames.
-            # Frames older than 300 are evicted to prevent disk exhaustion during 50,000-frame runs:
-            CIRCULAR_VIDEO_BUFFER_LIMIT = 300
-            if i >= CIRCULAR_VIDEO_BUFFER_LIMIT:
-                old_vid_idx = i - CIRCULAR_VIDEO_BUFFER_LIMIT
-                for vid_filename in [
-                    f"video_frame_{old_vid_idx:03d}.jpg",
-                    f"video_frame_left_{old_vid_idx:03d}.jpg",
-                    f"video_frame_right_{old_vid_idx:03d}.jpg",
-                    f"video_frame_blend_{old_vid_idx:03d}.jpg",
-                    f"disparity_{old_vid_idx:03d}.png"
-                ]:
-                    old_vid_path = os.path.join(seq_dir, vid_filename)
-                    if os.path.exists(old_vid_path):
-                        try:
-                            os.remove(old_vid_path)
-                        except OSError:
-                            pass
+            # Optional Circular video buffer eviction (Default OFF: saves all frames on disk):
+            if enable_circular_buffer:
+                CIRCULAR_VIDEO_BUFFER_LIMIT = 300
+                if i >= CIRCULAR_VIDEO_BUFFER_LIMIT:
+                    old_vid_idx = i - CIRCULAR_VIDEO_BUFFER_LIMIT
+                    for vid_filename in [
+                        f"video_frame_{old_vid_idx:03d}.jpg",
+                        f"video_frame_left_{old_vid_idx:03d}.jpg",
+                        f"video_frame_right_{old_vid_idx:03d}.jpg",
+                        f"video_frame_blend_{old_vid_idx:03d}.jpg",
+                        f"disparity_{old_vid_idx:03d}.png"
+                    ]:
+                        old_vid_path = os.path.join(seq_dir, vid_filename)
+                        if os.path.exists(old_vid_path):
+                            try:
+                                os.remove(old_vid_path)
+                            except OSError:
+                                pass
 
             # BUT ALL WASS OUTPUT PLOTS, 3D POINT CLOUDS, TELEMETRY & CSVS MUST BE PERMANENTLY SAVED:
             # - points_{i:03d}.json & .xyz
@@ -718,7 +717,7 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=50000, step=1, recons
         log(f"\n[Error] Pipeline failed: {str(e)}")
 
 
-def run_pipeline_worker(video0, video1, video_sbs, max_frames=50000, step=1, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True, entire_video=True):
+def run_pipeline_worker(video0, video1, video_sbs, max_frames=50000, step=1, use_sample=None, gopro_model="auto", gopro_fov="auto", start_frame=0, enable_audio_sync=True, entire_video=True, enable_circular_buffer=False):
     with pipeline_lock:
         pipeline_state["status"] = "running"
         pipeline_state["progress"] = 5
@@ -864,7 +863,7 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames=50000, step=1, use
         log("[Format] Translating native WASS C++ point clouds and disparity maps to sequence artifacts...")
         seq_dir = os.path.join(work_dir, "sequence")
         from wass_webapp.wass_video_pipeline import format_wass_workspaces_to_sequence
-        rendered_count = format_wass_workspaces_to_sequence(workspaces, seq_dir)
+        rendered_count = format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=enable_circular_buffer)
         log(f"  -> Successfully formatted {rendered_count} native WASS frames into 3D point clouds and telemetry.")
 
         invalidate_caches()
@@ -918,6 +917,7 @@ async def start_pipeline(
     start_frame: int = Form(0),
     step: int = Form(1),
     enable_audio_sync: bool = Form(True),
+    enable_circular_buffer: bool = Form(False),
     gopro_model: str = Form("auto"),
     gopro_fov: str = Form("auto")
 ):
@@ -951,7 +951,8 @@ async def start_pipeline(
             step=step,
             start_frame=start_frame,
             enable_audio_sync=enable_audio_sync,
-            entire_video=entire_video
+            entire_video=entire_video,
+            enable_circular_buffer=enable_circular_buffer
         )
         return JSONResponse({"status": "started", "source": video_source, "entire_video": entire_video, "frames": max_frames, "start_frame": start_frame})
 
@@ -1039,7 +1040,8 @@ async def start_pipeline(
         gopro_fov=gopro_fov,
         start_frame=start_frame,
         enable_audio_sync=enable_audio_sync,
-        entire_video=entire_video
+        entire_video=entire_video,
+        enable_circular_buffer=enable_circular_buffer
     )
 
     return JSONResponse({"status": "started", "source": video_source, "entire_video": entire_video, "frames": max_frames})
