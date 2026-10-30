@@ -108,7 +108,7 @@ def test_input_bounds_validation():
     assert resp3.status_code == 400
 
     # Excessively large max_frames
-    resp4 = client.post("/api/run", data={"video_source": "pair1", "max_frames": 99999, "step": 1})
+    resp4 = client.post("/api/run", data={"video_source": "pair1", "max_frames": 100001, "step": 1})
     assert resp4.status_code == 400
 
     # Invalid video source

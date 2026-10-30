@@ -10,6 +10,7 @@ import sys
 import glob
 import shutil
 import argparse
+import subprocess
 try:
     import cv2
 except ImportError:
@@ -277,7 +278,7 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
                 break
             if frame_count % step == 0:
                 h, w, _ = frame0.shape
-                ts_ms = int((frame_count / fps) * 1000.0)
+                ts_ms = int(((frame_count + start_frame) / fps) * 1000.0)
                 name0 = f"{saved_count:06d}_{ts_ms:013d}_01.png"
                 name1 = f"{saved_count:06d}_{ts_ms:013d}_02.png"
 
