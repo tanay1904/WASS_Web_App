@@ -347,4 +347,137 @@ def test_api_stereo_feed_selection():
     assert "baseline_differential" in f0
 
 
+def test_interpolate_frame_from_series():
+    """Verify linear interpolation of physical IMU telemetry across arbitrary timestamps."""
+    from wass_webapp.gopro_imu import interpolate_frame_from_series
+
+    f0 = {
+        "frame_index": 0,
+        "timestamp_sec": 0.0,
+        "gyroscope": {"x_dps": 2.0, "y_dps": 4.0, "z_dps": -1.0},
+        "accelerometer": {"x_g": 0.10, "y_g": 0.20, "z_g": 0.98},
+        "attitude": {"pitch_deg": 5.0, "roll_deg": -3.0, "yaw_deg": 10.0}
+    }
+    f1 = {
+        "frame_index": 1,
+        "timestamp_sec": 0.1,
+        "gyroscope": {"x_dps": 4.0, "y_dps": 8.0, "z_dps": -3.0},
+        "accelerometer": {"x_g": 0.30, "y_g": 0.40, "z_g": 1.02},
+        "attitude": {"pitch_deg": 7.0, "roll_deg": -1.0, "yaw_deg": 12.0}
+    }
+    series = [f0, f1]
+
+    # Exact boundary 0.0
+    res0 = interpolate_frame_from_series(series, 0.0)
+    assert res0["timestamp_sec"] == 0.0
+    assert res0["gyroscope"]["x_dps"] == 2.0
+
+    # Midpoint 0.05
+    res_mid = interpolate_frame_from_series(series, 0.05)
+    assert res_mid["timestamp_sec"] == 0.05
+    assert res_mid["gyroscope"]["x_dps"] == 3.0
+    assert res_mid["gyroscope"]["y_dps"] == 6.0
+    assert res_mid["gyroscope"]["z_dps"] == -2.0
+    assert res_mid["accelerometer"]["x_g"] == 0.20
+    assert res_mid["attitude"]["pitch_deg"] == 6.0
+
+    # Clamping below 0
+    res_neg = interpolate_frame_from_series(series, -0.05)
+    assert res_neg["timestamp_sec"] == -0.05
+    assert res_neg["gyroscope"]["x_dps"] == 2.0
+
+    # Clamping above max
+    res_hi = interpolate_frame_from_series(series, 0.25)
+    assert res_hi["timestamp_sec"] == 0.25
+    assert res_hi["gyroscope"]["x_dps"] == 4.0
+
+
+def test_get_audio_sync_offset_computation(tmp_path):
+    """Verify audio sync offset calculation and JSON caching."""
+    import wave
+    import numpy as np
+    from wass_webapp.gopro_imu import get_audio_sync_offset
+
+    sr = 48000
+    t = np.linspace(0, 1.0, sr)
+    sig = np.sin(2 * np.pi * 500 * t) + 0.02 * np.random.randn(len(t))
+    lag = 960  # 20.0 ms
+    s0 = sig[lag:]
+    s1 = sig[:-lag]
+
+    w0 = tmp_path / "c0.wav"
+    w1 = tmp_path / "c1.wav"
+    for path, s in [(w0, s0), (w1, s1)]:
+        with wave.open(str(path), "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
+            wf.writeframes((s * 32767).astype(np.int16).tobytes())
+
+    res = get_audio_sync_offset(str(tmp_path), pair_id="pair1", cam0_path=str(w0), cam1_path=str(w1))
+    assert "offset_seconds" in res
+    assert abs(abs(res["offset_ms"]) - 20.0) <= 0.2
+    assert (tmp_path / "audio_sync_pair1.json").exists()
+
+
+def test_binocular_stereo_audio_sync_toggle(tmp_path):
+    """Verify binocular stereo IMU applies acoustic offset when enabled and nominal clocks when disabled."""
+    from wass_webapp.gopro_imu import get_or_extract_binocular_stereo_imu
+    from wass_webapp.app import WORK_DIR
+
+    seq_dir = os.path.join(WORK_DIR, "sequence")
+
+    # 1. Audio Sync ENABLED
+    payload_synced = get_or_extract_binocular_stereo_imu(seq_dir, pair="pair1", enable_audio_sync=True)
+    assert payload_synced.get("audio_sync", {}).get("enabled") is True
+    offset_sec = payload_synced["audio_sync"]["offset_seconds"]
+    assert offset_sec > 0.0
+    f1_synced = payload_synced["frames"][1]
+    assert f1_synced["audio_sync"]["enabled"] is True
+    assert "cam1" in f1_synced
+
+    # 2. Audio Sync DISABLED
+    payload_nosync = get_or_extract_binocular_stereo_imu(seq_dir, pair="pair1", enable_audio_sync=False)
+    assert payload_nosync.get("audio_sync", {}).get("enabled") is False
+    assert payload_nosync["audio_sync"]["offset_seconds"] == 0.0
+    f1_nosync = payload_nosync["frames"][1]
+    assert f1_nosync["audio_sync"]["enabled"] is False
+
+    # Verify that Cam 1's values or timestamps differ between synced and nosync
+    assert f1_synced["cam1"]["timestamp_sec"] != f1_nosync["cam1"]["timestamp_sec"]
+    assert abs(f1_synced["cam1"]["timestamp_sec"] - (f1_nosync["cam1"]["timestamp_sec"] - offset_sec)) < 1e-4
+
+
+def test_api_audio_sync_endpoints():
+    """Verify /api/telemetry/imu?audio_sync=true|false and /api/telemetry/imu/toggle_audio_sync."""
+    # 1. Query with audio_sync=true
+    r_true = client.get("/api/telemetry/imu?audio_sync=true")
+    assert r_true.status_code == 200
+    d_true = r_true.json()
+    assert d_true.get("audio_sync", {}).get("enabled") is True
+    assert d_true["audio_sync"]["offset_seconds"] > 0
+
+    # 2. Query with audio_sync=false
+    r_false = client.get("/api/telemetry/imu?audio_sync=false")
+    assert r_false.status_code == 200
+    d_false = r_false.json()
+    assert d_false.get("audio_sync", {}).get("enabled") is False
+    assert d_false["audio_sync"]["offset_seconds"] == 0.0
+
+    # 3. Toggle audio sync via POST endpoint
+    r_toggle_off = client.post("/api/telemetry/imu/toggle_audio_sync", json={"enabled": False})
+    assert r_toggle_off.status_code == 200
+    d_off = r_toggle_off.json()
+    assert d_off["status"] == "success"
+    assert d_off["audio_sync_enabled"] is False
+    assert d_off["telemetry"]["audio_sync"]["enabled"] is False
+
+    r_toggle_on = client.post("/api/telemetry/imu/toggle_audio_sync", json={"enabled": True})
+    assert r_toggle_on.status_code == 200
+    d_on = r_toggle_on.json()
+    assert d_on["status"] == "success"
+    assert d_on["audio_sync_enabled"] is True
+    assert d_on["telemetry"]["audio_sync"]["enabled"] is True
+
+
 

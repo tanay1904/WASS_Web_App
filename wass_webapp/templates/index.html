@@ -606,9 +606,15 @@
                       <option value="GX011274.MP4">Cam 1 (Pair 2 Right - GX011274)</option>
                     </select>
                   </div>
-                  <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
-                    <i class="fa-solid fa-circle-check me-1"></i> Dual Cam GPMF
-                  </span>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="form-check form-switch m-0 d-flex align-items-center gap-1" id="imuAudioSyncWrap" title="Synchronize dual camera IMUs using acoustic cross-correlation offset">
+                      <input class="form-check-input my-0" type="checkbox" id="imuAudioSyncCheck" checked style="cursor: pointer; height: 13px; width: 25px;" onchange="toggleImuAudioSync(this.checked)">
+                      <label class="form-check-label font-monospace" for="imuAudioSyncCheck" style="font-size: 0.60rem; cursor: pointer; color: #38bdf8;" id="imuAudioSyncLabel"><i class="fa-solid fa-microphone-lines text-warning me-1"></i> Audio Sync: ON (+33.3ms)</label>
+                    </div>
+                    <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
+                      <i class="fa-solid fa-circle-check me-1"></i> Dual Cam GPMF
+                    </span>
+                  </div>
                 </div>
 
                 <!-- Dual Camera Synchronized 3-Axis Telemetry Readouts -->
@@ -692,10 +698,11 @@
                     <span class="text-warning fw-semibold">
                       <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Baseline Differential (Δ Cam1 - Cam0):
                     </span>
-                    <span class="text-light">
+                    <span class="text-light d-flex align-items-center gap-1">
                       <span class="text-muted me-1">Δ|ω|:</span><span class="fw-bold text-warning" id="imuDiffGyroMag">0.00°/s</span>
                       <span class="text-muted mx-1">|</span>
                       <span class="text-muted me-1">Δ|a|:</span><span class="fw-bold text-info" id="imuDiffAccelMag">0.000 g</span>
+                      <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace ms-1" style="font-size: 0.52rem;" id="imuDiffSyncTag">Acoustically Aligned</span>
                     </span>
                   </div>
                 </div>
@@ -2827,6 +2834,13 @@
           showTab('player');
         }
       });
+
+      const modalAudio = document.getElementById('enableAudioSync');
+      if (modalAudio) {
+        modalAudio.addEventListener('change', (e) => {
+          toggleImuAudioSync(e.target.checked);
+        });
+      }
     });
 
     function toggleSourceInputs() {
@@ -3013,11 +3027,16 @@
       drawImuMotionCanvas(currentFrame);
     }
 
-    async function loadImuTelemetry(feedName = null) {
+    let imuAudioSyncEnabled = true;
+
+    async function loadImuTelemetry(feedName = null, audioSync = null) {
       if (isFetchingImu) return;
       isFetchingImu = true;
       try {
-        let url = '/api/telemetry/imu?t=' + Date.now();
+        if (audioSync !== null) {
+          imuAudioSyncEnabled = Boolean(audioSync);
+        }
+        let url = '/api/telemetry/imu?t=' + Date.now() + '&audio_sync=' + imuAudioSyncEnabled;
         if (feedName) {
           url += '&feed=' + encodeURIComponent(feedName);
         }
@@ -3043,7 +3062,7 @@
             if (badge) {
               let srcLabel = '200 Hz Dual GPMF';
               if (data.source && data.source.includes('Binocular Stereo')) {
-                srcLabel = 'Dual Cam GPMF';
+                srcLabel = data.audio_sync && data.audio_sync.enabled ? 'Dual GPMF (Acoustic Sync)' : 'Dual Cam GPMF';
               } else if (data.source && data.source.includes('OneDrive')) {
                 srcLabel = 'Pure .MP4 GPMF';
               } else if (data.source && data.source.includes('Local MP4')) {
@@ -3056,6 +3075,9 @@
               badge.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> ${srcLabel}`;
               badge.title = data.source || 'Genuine GoPro Physical IMU Telemetry';
             }
+
+            updateAudioSyncUI(data.audio_sync, Boolean(data.stereo_mode));
+
             // Ensure sequence accommodates any additional frames being processed
             const requiredCount = Math.max(typeof totalFrames === 'number' ? totalFrames : 0, currentFrame + 1, imuSequenceData.length);
             if (requiredCount > imuSequenceData.length) {
@@ -3074,6 +3096,79 @@
       updateImuDashboard(currentFrame);
     }
 
+    async function toggleImuAudioSync(checked) {
+      imuAudioSyncEnabled = checked;
+      // Sync modal checkbox
+      const modalCheck = document.getElementById('enableAudioSync');
+      if (modalCheck && modalCheck.checked !== checked) {
+        modalCheck.checked = checked;
+      }
+      const imuCheck = document.getElementById('imuAudioSyncCheck');
+      if (imuCheck && imuCheck.checked !== checked) {
+        imuCheck.checked = checked;
+      }
+
+      const lbl = document.getElementById('imuAudioSyncLabel');
+      if (lbl) {
+        lbl.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> Syncing...`;
+      }
+
+      try {
+        const feedSelector = document.getElementById('imuFeedSelector');
+        const activeFeed = feedSelector ? feedSelector.value : 'pair1_stereo';
+        await fetch('/api/telemetry/imu/toggle_audio_sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: checked })
+        });
+        await loadImuTelemetry(activeFeed, checked);
+      } catch (e) {
+        console.warn('[IMU] Audio sync toggle note:', e);
+      }
+    }
+
+    function updateAudioSyncUI(syncInfo, isStereo) {
+      const wrap = document.getElementById('imuAudioSyncWrap');
+      const check = document.getElementById('imuAudioSyncCheck');
+      const lbl = document.getElementById('imuAudioSyncLabel');
+      const modalCheck = document.getElementById('enableAudioSync');
+      const tag = document.getElementById('imuDiffSyncTag');
+
+      if (wrap) {
+        wrap.style.display = isStereo ? 'flex' : 'none';
+      }
+
+      const isEnabled = syncInfo ? Boolean(syncInfo.enabled) : imuAudioSyncEnabled;
+      if (check) check.checked = isEnabled;
+      if (modalCheck) modalCheck.checked = isEnabled;
+
+      if (lbl) {
+        if (isEnabled) {
+          const offsetMs = syncInfo && syncInfo.offset_ms !== undefined ? syncInfo.offset_ms : 33.3;
+          const sign = offsetMs >= 0 ? '+' : '';
+          lbl.style.color = '#38bdf8';
+          lbl.innerHTML = `<i class="fa-solid fa-microphone-lines text-warning me-1"></i> Audio Sync: <b>ON</b> (${sign}${offsetMs.toFixed(1)}ms)`;
+          lbl.title = `Sub-millisecond acoustic cross-correlation: ${sign}${offsetMs.toFixed(2)} ms temporal shift applied to Cam 1`;
+        } else {
+          lbl.style.color = '#94a3b8';
+          lbl.innerHTML = `<i class="fa-solid fa-microphone-slash me-1"></i> Audio Sync: <b>OFF</b> (0ms)`;
+          lbl.title = `Raw unshifted video frame alignment (no acoustic correction)`;
+        }
+      }
+
+      if (tag) {
+        if (isEnabled) {
+          tag.className = 'badge bg-success-subtle text-success border border-success-subtle font-monospace ms-1';
+          tag.textContent = 'Acoustically Aligned';
+          tag.title = 'Cam 1 time-shifted by acoustic cross-correlation lag';
+        } else {
+          tag.className = 'badge bg-secondary-subtle text-secondary border border-secondary font-monospace ms-1';
+          tag.textContent = 'Nominal Frame Clocks';
+          tag.title = 'Cam 1 evaluated at nominal unshifted frame timestamp (0 ms)';
+        }
+      }
+    }
+
     async function switchCameraImuFeed(feedName) {
       if (!feedName) return;
       try {
@@ -3084,12 +3179,12 @@
         await fetch('/api/telemetry/imu/select_feed', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feed: feedName })
+          body: JSON.stringify({ feed: feedName, audio_sync: imuAudioSyncEnabled })
         });
       } catch (e) {
         console.warn('[IMU] Feed switch request note:', e);
       }
-      await loadImuTelemetry(feedName);
+      await loadImuTelemetry(feedName, imuAudioSyncEnabled);
     }
 
     async function populateAvailableImuFeeds() {

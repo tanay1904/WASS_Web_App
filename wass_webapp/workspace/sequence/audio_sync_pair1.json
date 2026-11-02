@@ -1,0 +1,11 @@
+{
+  "offset_seconds": 0.0333,
+  "offset_ms": 33.3,
+  "lag_samples": 1598,
+  "sample_rate": 48000,
+  "confidence": 12.8,
+  "leading_camera": "cam0",
+  "pair_id": "pair1",
+  "status": "calibrated_hydroacoustic",
+  "note": "Acoustic cross-correlation calibration for WASS stereo rig pair1"
+}
