@@ -241,3 +241,110 @@ def test_api_multi_camera_feed_query():
     assert len(data.get("frames", [])) > 0
 
 
+def test_binocular_stereo_imu_structure():
+    """Verify binocular stereo extraction accommodates both Cam 0 and Cam 1 with differential kinematics."""
+    from wass_webapp.gopro_imu import get_or_extract_binocular_stereo_imu
+    from wass_webapp.app import WORK_DIR
+    seq_dir = os.path.join(WORK_DIR, "sequence")
+    payload = get_or_extract_binocular_stereo_imu(seq_dir, pair="pair1", total_frames=840)
+    assert payload.get("stereo_mode") is True
+    assert payload.get("pair_id") == "pair1"
+    assert payload.get("cam0_feed") == "GX010077.MP4"
+    assert payload.get("cam1_feed") == "GX011273.MP4"
+    frames = payload.get("frames", [])
+    assert len(frames) >= 840
+
+    f0 = frames[0]
+    # 1. Cam 0 Left Camera
+    assert "cam0" in f0
+    assert f0["cam0"]["feed"] == "GX010077.MP4"
+    assert "gyroscope" in f0["cam0"]
+    assert "accelerometer" in f0["cam0"]
+
+    # 2. Cam 1 Right Camera
+    assert "cam1" in f0
+    assert f0["cam1"]["feed"] == "GX011273.MP4"
+    assert "gyroscope" in f0["cam1"]
+    assert "accelerometer" in f0["cam1"]
+
+    # 3. Baseline Differential Dynamics
+    assert "baseline_differential" in f0
+    diff = f0["baseline_differential"]
+    assert "delta_gyro_dps" in diff
+    assert "delta_accel_g" in diff
+    assert "mag" in diff["delta_gyro_dps"]
+    assert "mag" in diff["delta_accel_g"]
+
+    # 4. Top-level backward compatibility
+    assert "gyroscope" in f0
+    assert "accelerometer" in f0
+    assert "x_dps" in f0["gyroscope"]
+    assert "z_g" in f0["accelerometer"]
+
+
+def test_binocular_stereo_csv_export(tmp_path):
+    """Verify CSV exporter produces both Cam 0 and Cam 1 columns and differential magnitudes."""
+    from wass_webapp.gopro_imu import extract_frame_imu_scalars, export_frame_imu_csv, export_all_frames_imu_csv
+
+    stereo_mock_frame = {
+        "frame_index": 5,
+        "timestamp_sec": 0.1667,
+        "stereo_mode": True,
+        "cam0": {
+            "gyroscope": {"x_dps": 1.20, "y_dps": -0.80, "z_dps": 0.30},
+            "accelerometer": {"x_g": 0.050, "y_g": -0.030, "z_g": 1.020}
+        },
+        "cam1": {
+            "gyroscope": {"x_dps": 1.50, "y_dps": -0.60, "z_dps": 0.40},
+            "accelerometer": {"x_g": 0.060, "y_g": -0.020, "z_g": 0.980}
+        },
+        "baseline_differential": {
+            "delta_gyro_dps": {"x": 0.30, "y": 0.20, "z": 0.10, "mag": 0.37},
+            "delta_accel_g": {"x": 0.010, "y": 0.010, "z": -0.040, "mag": 0.042}
+        },
+        "gyroscope": {"x_dps": 1.20, "y_dps": -0.80, "z_dps": 0.30},
+        "accelerometer": {"x_g": 0.050, "y_g": -0.030, "z_g": 1.020}
+    }
+
+    s = extract_frame_imu_scalars(stereo_mock_frame)
+    assert s["is_stereo"] is True
+    assert s["cam0_gyro_x_dps"] == 1.20
+    assert s["cam1_gyro_x_dps"] == 1.50
+    assert s["delta_gyro_x_dps"] == 0.30
+    assert s["cam0_accel_z_g"] == 1.020
+    assert s["cam1_accel_z_g"] == 0.980
+
+    out_csv = tmp_path / "gopro_imu_005.csv"
+    export_frame_imu_csv(str(tmp_path), 5, imu_entry=stereo_mock_frame, out_csv_path=str(out_csv))
+    assert out_csv.exists()
+    content = out_csv.read_text(encoding="utf-8")
+    lines = content.strip().split("\n")
+    assert "cam0_gyro_x_dps" in lines[0]
+    assert "cam1_gyro_x_dps" in lines[0]
+    assert "delta_gyro_mag_dps" in lines[0]
+    assert "1.20,-0.80,0.30" in lines[1]
+    assert "1.50,-0.60,0.40" in lines[1]
+
+
+def test_api_stereo_feed_selection():
+    """Verify switching to pair1_stereo feed via POST and querying active telemetry."""
+    # 1. Switch active feed to pair1_stereo
+    resp = client.post("/api/telemetry/imu/select_feed", json={"feed": "pair1_stereo"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "success"
+    assert data["active_feed"] == "pair1_stereo"
+
+    # 2. Query default GET /api/telemetry/imu
+    resp_get = client.get("/api/telemetry/imu")
+    assert resp_get.status_code == 200
+    tel = resp_get.json()
+    assert tel.get("stereo_mode") is True
+    assert len(tel.get("frames", [])) >= 840
+    f0 = tel["frames"][0]
+    assert "cam0" in f0
+    assert "cam1" in f0
+    assert "baseline_differential" in f0
+
+
+

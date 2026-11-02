@@ -590,80 +590,125 @@
                 </div>
               </div>
 
-              <!-- GoPro Raw IMU Telemetry (vguzov/gopro_imu_extractor) -->
+              <!-- GoPro Raw IMU Telemetry (InvenSense ICM-20689 Binocular Rig) -->
               <div class="flex-shrink-0 p-2 rounded" style="background-color: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);" id="goproImuCard">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <div class="d-flex align-items-center gap-1">
                     <span class="stat-label mb-0">
                       <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU:
                     </span>
-                    <select class="form-select form-select-sm py-0 px-1 font-monospace" id="imuFeedSelector" style="font-size: 0.65rem; height: 21px; width: auto; background-color: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-primary); cursor: pointer;" onchange="switchCameraImuFeed(this.value)" title="Select physical GoPro camera sensor feed">
-                      <option value="GX010077.MP4" selected>Cam 0 (Pair 1 Left)</option>
-                      <option value="GX011273.MP4">Cam 1 (Pair 1 Right)</option>
-                      <option value="GX010078.MP4">Cam 0 (Pair 2 Left)</option>
-                      <option value="GX011274.MP4">Cam 1 (Pair 2 Right)</option>
+                    <select class="form-select form-select-sm py-0 px-1 font-monospace" id="imuFeedSelector" style="font-size: 0.65rem; height: 21px; width: auto; background-color: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-primary); cursor: pointer;" onchange="switchCameraImuFeed(this.value)" title="Select physical GoPro camera sensor feed or stereo pair">
+                      <option value="pair1_stereo" selected>★ Stereo Rig: Pair 1 (Cam 0 + Cam 1)</option>
+                      <option value="pair2_stereo">★ Stereo Rig: Pair 2 (Cam 0 + Cam 1)</option>
+                      <option value="GX010077.MP4">Cam 0 (Pair 1 Left - GX010077)</option>
+                      <option value="GX011273.MP4">Cam 1 (Pair 1 Right - GX011273)</option>
+                      <option value="GX010078.MP4">Cam 0 (Pair 2 Left - GX010078)</option>
+                      <option value="GX011274.MP4">Cam 1 (Pair 2 Right - GX011274)</option>
                     </select>
                   </div>
                   <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
-                    <i class="fa-solid fa-circle-check me-1"></i> Pure .MP4 GPMF
+                    <i class="fa-solid fa-circle-check me-1"></i> Dual Cam GPMF
                   </span>
                 </div>
 
-                <!-- 3-Axis Gyroscope Section (deg/s) -->
-                <div class="mb-1 p-1 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
-                  <div class="d-flex justify-content-between align-items-center px-1 mb-1">
-                    <span class="text-warning fw-semibold" style="font-size: 0.65rem;"><i class="fa-solid fa-rotate me-1"></i> 3-Axis Gyroscope (Angular Rate)</span>
-                    <span class="font-monospace text-secondary" style="font-size: 0.62rem;" id="imuGyroTotal">|ω|: 0.00°/s</span>
+                <!-- Dual Camera Synchronized 3-Axis Telemetry Readouts -->
+                <div class="row g-1 mb-1">
+                  <!-- Cam 0 (Left Camera) Column -->
+                  <div class="col-6">
+                    <div class="p-1 rounded border h-100" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(56, 189, 248, 0.35) !important;">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-info" style="font-size: 0.62rem;" id="imuCam0Title">
+                          <i class="fa-solid fa-camera me-1"></i> Cam 0 (Left)
+                        </span>
+                        <span class="font-monospace text-secondary" style="font-size: 0.58rem;" id="imuCam0Feed">GX010077</span>
+                      </div>
+                      <!-- Cam 0 Gyro -->
+                      <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
+                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
+                          <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyro (deg/s)</span>
+                          <span class="font-monospace text-muted" id="imuCam0GyroTotal">|ω|: 0.00°/s</span>
+                        </div>
+                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
+                          <div><span class="text-muted" style="font-size: 0.52rem;">ωx:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam0GyroX">+0.00</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">ωy:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam0GyroY">+0.00</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">ωz:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam0GyroZ">+0.00</span></div>
+                        </div>
+                      </div>
+                      <!-- Cam 0 Accel -->
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
+                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
+                          <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accel (g)</span>
+                          <span class="font-monospace text-success fw-bold" id="imuCam0AccelTotal">|a|: 1.000 g</span>
+                        </div>
+                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
+                          <div><span class="text-muted" style="font-size: 0.52rem;">Ax:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam0AccelX">+0.000</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">Ay:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam0AccelY">+0.000</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">Az:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam0AccelZ">+1.000</span></div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="row g-1 text-center font-monospace" style="font-size: 0.7rem;">
-                    <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.3) !important;">
-                        <span class="text-muted" style="font-size: 0.58rem;">ωx (Roll):</span><br>
-                        <span class="fw-bold" style="color: #f43f5e;" id="imuGyroX">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+
+                  <!-- Cam 1 (Right Camera) Column -->
+                  <div class="col-6">
+                    <div class="p-1 rounded border h-100" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(168, 85, 247, 0.35) !important;">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold" style="font-size: 0.62rem; color: #c084fc;" id="imuCam1Title">
+                          <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right)
+                        </span>
+                        <span class="font-monospace text-secondary" style="font-size: 0.58rem;" id="imuCam1Feed">GX011273</span>
                       </div>
-                    </div>
-                    <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.3) !important;">
-                        <span class="text-muted" style="font-size: 0.58rem;">ωy (Pitch):</span><br>
-                        <span class="fw-bold" style="color: #10b981;" id="imuGyroY">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                      <!-- Cam 1 Gyro -->
+                      <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
+                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
+                          <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyro (deg/s)</span>
+                          <span class="font-monospace text-muted" id="imuCam1GyroTotal">|ω|: 0.00°/s</span>
+                        </div>
+                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
+                          <div><span class="text-muted" style="font-size: 0.52rem;">ωx:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam1GyroX">+0.00</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">ωy:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam1GyroY">+0.00</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">ωz:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam1GyroZ">+0.00</span></div>
+                        </div>
                       </div>
-                    </div>
-                    <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
-                        <span class="text-muted" style="font-size: 0.58rem;">ωz (Yaw):</span><br>
-                        <span class="fw-bold" style="color: #38bdf8;" id="imuGyroZ">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                      <!-- Cam 1 Accel -->
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
+                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
+                          <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accel (g)</span>
+                          <span class="font-monospace text-success fw-bold" id="imuCam1AccelTotal">|a|: 1.000 g</span>
+                        </div>
+                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
+                          <div><span class="text-muted" style="font-size: 0.52rem;">Ax:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam1AccelX">+0.000</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">Ay:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam1AccelY">+0.000</span></div>
+                          <div><span class="text-muted" style="font-size: 0.52rem;">Az:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam1AccelZ">+1.000</span></div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- 3-Axis Accelerometer Section (g / m/s²) -->
-                <div class="mb-1 p-1 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
-                  <div class="d-flex justify-content-between align-items-center px-1 mb-1">
-                    <span class="text-info fw-semibold" style="font-size: 0.65rem;"><i class="fa-solid fa-gauge-high me-1"></i> 3-Axis Accelerometer (Linear G-Force)</span>
-                    <span class="font-monospace text-success fw-bold" style="font-size: 0.62rem;" id="imuAccelTotal">|a|: 1.000 g</span>
-                  </div>
-                  <div class="row g-1 text-center font-monospace" style="font-size: 0.7rem;">
-                    <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.3) !important;">
-                        <span class="text-muted" style="font-size: 0.58rem;">Ax (Surge):</span><br>
-                        <span class="fw-bold" style="color: #f43f5e;" id="imuAccelX">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
-                      </div>
-                    </div>
-                    <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.3) !important;">
-                        <span class="text-muted" style="font-size: 0.58rem;">Ay (Sway):</span><br>
-                        <span class="fw-bold" style="color: #10b981;" id="imuAccelY">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
-                      </div>
-                    </div>
-                    <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
-                        <span class="text-muted" style="font-size: 0.58rem;">Az (Heave):</span><br>
-                        <span class="fw-bold" style="color: #38bdf8;" id="imuAccelZ">+1.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
-                      </div>
-                    </div>
+                <!-- Stereo Baseline Differential Strip -->
+                <div class="p-1 rounded border mb-1" id="imuBaselineDiffStrip" style="background: rgba(15, 23, 42, 0.65); border-color: rgba(245, 158, 11, 0.3) !important;">
+                  <div class="d-flex justify-content-between align-items-center font-monospace" style="font-size: 0.6rem;">
+                    <span class="text-warning fw-semibold">
+                      <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Baseline Differential (Δ Cam1 - Cam0):
+                    </span>
+                    <span class="text-light">
+                      <span class="text-muted me-1">Δ|ω|:</span><span class="fw-bold text-warning" id="imuDiffGyroMag">0.00°/s</span>
+                      <span class="text-muted mx-1">|</span>
+                      <span class="text-muted me-1">Δ|a|:</span><span class="fw-bold text-info" id="imuDiffAccelMag">0.000 g</span>
+                    </span>
                   </div>
                 </div>
+
+                <!-- Hidden backward-compatibility elements -->
+                <span id="imuGyroX" class="d-none">+0.00</span>
+                <span id="imuGyroY" class="d-none">+0.00</span>
+                <span id="imuGyroZ" class="d-none">+0.00</span>
+                <span id="imuGyroTotal" class="d-none">|ω|: 0.00°/s</span>
+                <span id="imuAccelX" class="d-none">+0.000</span>
+                <span id="imuAccelY" class="d-none">+0.000</span>
+                <span id="imuAccelZ" class="d-none">+1.000</span>
+                <span id="imuAccelTotal" class="d-none">|a|: 1.000 g</span>
 
                 <!-- 3-Axis Multi-Trace Waveforms -->
                 <div class="mt-1">
@@ -671,38 +716,47 @@
                   <div class="d-flex justify-content-between align-items-center mb-1">
                     <span class="font-monospace text-muted" style="font-size: 0.6rem;" id="imuSampleIdxLbl">Frame 0</span>
                     <div class="btn-group btn-group-sm" style="font-size: 0.6rem;">
-                      <button type="button" class="btn btn-outline-secondary py-0 px-1 active" id="btnImuModeDual" onclick="setImuGraphMode('dual')" style="font-size: 0.58rem;">Dual Split</button>
-                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeGyro" onclick="setImuGraphMode('gyro')" style="font-size: 0.58rem;">Gyro 3-Axis</button>
-                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeAccel" onclick="setImuGraphMode('accel')" style="font-size: 0.58rem;">Accel 3-Axis</button>
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1 active" id="btnImuModeDual" onclick="setImuGraphMode('dual')" style="font-size: 0.58rem;">Dual Overlay</button>
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeCam0" onclick="setImuGraphMode('cam0')" style="font-size: 0.58rem;">Cam 0 Left</button>
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeCam1" onclick="setImuGraphMode('cam1')" style="font-size: 0.58rem;">Cam 1 Right</button>
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeDiff" onclick="setImuGraphMode('diff')" style="font-size: 0.58rem;">Diff (Δ)</button>
                     </div>
                   </div>
 
                   <!-- Gyroscope 3-Axis Canvas Wrap -->
                   <div id="imuGyroCanvasWrap" class="mb-1">
                     <div class="d-flex justify-content-between align-items-center px-1" style="font-size: 0.58rem;">
-                      <span class="text-muted">
+                      <span class="text-muted" id="imuGyroLegend">
+                        <span class="text-info fw-semibold me-1">C0:</span>
                         <span style="color: #f43f5e;" class="me-1">● ωx</span>
                         <span style="color: #10b981;" class="me-1">● ωy</span>
-                        <span style="color: #38bdf8;">● ωz</span>
-                        <span class="text-muted ms-1">(deg/s)</span>
+                        <span style="color: #38bdf8;" class="me-2">● ωz</span>
+                        <span style="color: #c084fc;" class="fw-semibold me-1">C1:</span>
+                        <span style="color: #fb7185;" class="me-1">╌ ωx</span>
+                        <span style="color: #34d399;" class="me-1">╌ ωy</span>
+                        <span style="color: #7dd3fc;">╌ ωz</span>
                       </span>
                       <span class="font-monospace text-muted" style="font-size: 0.55rem;">Scale: ±14°/s</span>
                     </div>
-                    <canvas id="imuGyroCanvas" width="310" height="38" style="width: 100%; height: 38px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
+                    <canvas id="imuGyroCanvas" width="310" height="42" style="width: 100%; height: 42px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
                   </div>
 
                   <!-- Accelerometer 3-Axis Canvas Wrap -->
                   <div id="imuAccelCanvasWrap" class="mb-1">
                     <div class="d-flex justify-content-between align-items-center px-1" style="font-size: 0.58rem;">
-                      <span class="text-muted">
+                      <span class="text-muted" id="imuAccelLegend">
+                        <span class="text-info fw-semibold me-1">C0:</span>
                         <span style="color: #f43f5e;" class="me-1">● Ax</span>
                         <span style="color: #10b981;" class="me-1">● Ay</span>
-                        <span style="color: #38bdf8;">● Az-1g</span>
-                        <span class="text-muted ms-1">(g)</span>
+                        <span style="color: #38bdf8;" class="me-2">● Az-1g</span>
+                        <span style="color: #c084fc;" class="fw-semibold me-1">C1:</span>
+                        <span style="color: #fb7185;" class="me-1">╌ Ax</span>
+                        <span style="color: #34d399;" class="me-1">╌ Ay</span>
+                        <span style="color: #7dd3fc;">╌ Az-1g</span>
                       </span>
                       <span class="font-monospace text-muted" style="font-size: 0.55rem;">Scale: ±0.35g</span>
                     </div>
-                    <canvas id="imuAccelCanvas" width="310" height="38" style="width: 100%; height: 38px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
+                    <canvas id="imuAccelCanvas" width="310" height="42" style="width: 100%; height: 42px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
                   </div>
 
                   <!-- Export Action Buttons -->
@@ -2924,31 +2978,38 @@
     // ==============================================================================
     let imuSequenceData = null;
     let imuTelemetryLoaded = false;
-    let imuGraphMode = 'dual'; // 'dual', 'gyro', 'accel'
+    let imuGraphMode = 'dual'; // 'dual', 'cam0', 'cam1', 'diff'
     let isFetchingImu = false;
 
     function setImuGraphMode(mode) {
       imuGraphMode = mode;
-      const gyroWrap = document.getElementById('imuGyroCanvasWrap');
-      const accelWrap = document.getElementById('imuAccelCanvasWrap');
       const btnDual = document.getElementById('btnImuModeDual');
-      const btnGyro = document.getElementById('btnImuModeGyro');
-      const btnAccel = document.getElementById('btnImuModeAccel');
+      const btnCam0 = document.getElementById('btnImuModeCam0');
+      const btnCam1 = document.getElementById('btnImuModeCam1');
+      const btnDiff = document.getElementById('btnImuModeDiff');
 
       if (btnDual) btnDual.classList.toggle('active', mode === 'dual');
-      if (btnGyro) btnGyro.classList.toggle('active', mode === 'gyro');
-      if (btnAccel) btnAccel.classList.toggle('active', mode === 'accel');
+      if (btnCam0) btnCam0.classList.toggle('active', mode === 'cam0');
+      if (btnCam1) btnCam1.classList.toggle('active', mode === 'cam1');
+      if (btnDiff) btnDiff.classList.toggle('active', mode === 'diff');
+
+      const gLegend = document.getElementById('imuGyroLegend');
+      const aLegend = document.getElementById('imuAccelLegend');
 
       if (mode === 'dual') {
-        if (gyroWrap) gyroWrap.classList.remove('d-none');
-        if (accelWrap) accelWrap.classList.remove('d-none');
-      } else if (mode === 'gyro') {
-        if (gyroWrap) gyroWrap.classList.remove('d-none');
-        if (accelWrap) accelWrap.classList.add('d-none');
-      } else if (mode === 'accel') {
-        if (gyroWrap) gyroWrap.classList.add('d-none');
-        if (accelWrap) accelWrap.classList.remove('d-none');
+        if (gLegend) gLegend.innerHTML = '<span class="text-info fw-semibold me-1">C0:</span><span style="color:#f43f5e;" class="me-1">● ωx</span><span style="color:#10b981;" class="me-1">● ωy</span><span style="color:#38bdf8;" class="me-2">● ωz</span><span style="color:#c084fc;" class="fw-semibold me-1">C1:</span><span style="color:#fb7185;" class="me-1">╌ ωx</span><span style="color:#34d399;" class="me-1">╌ ωy</span><span style="color:#7dd3fc;">╌ ωz</span>';
+        if (aLegend) aLegend.innerHTML = '<span class="text-info fw-semibold me-1">C0:</span><span style="color:#f43f5e;" class="me-1">● Ax</span><span style="color:#10b981;" class="me-1">● Ay</span><span style="color:#38bdf8;" class="me-2">● Az-1g</span><span style="color:#c084fc;" class="fw-semibold me-1">C1:</span><span style="color:#fb7185;" class="me-1">╌ Ax</span><span style="color:#34d399;" class="me-1">╌ Ay</span><span style="color:#7dd3fc;">╌ Az-1g</span>';
+      } else if (mode === 'cam0') {
+        if (gLegend) gLegend.innerHTML = '<span class="text-info fw-semibold me-1">Cam 0 (Left):</span><span style="color:#f43f5e;" class="me-1">● ωx</span><span style="color:#10b981;" class="me-1">● ωy</span><span style="color:#38bdf8;">● ωz (deg/s)</span>';
+        if (aLegend) aLegend.innerHTML = '<span class="text-info fw-semibold me-1">Cam 0 (Left):</span><span style="color:#f43f5e;" class="me-1">● Ax</span><span style="color:#10b981;" class="me-1">● Ay</span><span style="color:#38bdf8;">● Az-1g (g)</span>';
+      } else if (mode === 'cam1') {
+        if (gLegend) gLegend.innerHTML = '<span style="color:#c084fc;" class="fw-semibold me-1">Cam 1 (Right):</span><span style="color:#fb7185;" class="me-1">● ωx</span><span style="color:#34d399;" class="me-1">● ωy</span><span style="color:#7dd3fc;">● ωz (deg/s)</span>';
+        if (aLegend) aLegend.innerHTML = '<span style="color:#c084fc;" class="fw-semibold me-1">Cam 1 (Right):</span><span style="color:#fb7185;" class="me-1">● Ax</span><span style="color:#34d399;" class="me-1">● Ay</span><span style="color:#7dd3fc;">● Az-1g (g)</span>';
+      } else if (mode === 'diff') {
+        if (gLegend) gLegend.innerHTML = '<span class="text-warning fw-semibold me-1">Stereo Δ (C1-C0):</span><span style="color:#f43f5e;" class="me-1">● Δωx</span><span style="color:#10b981;" class="me-1">● Δωy</span><span style="color:#38bdf8;">● Δωz (deg/s)</span>';
+        if (aLegend) aLegend.innerHTML = '<span class="text-warning fw-semibold me-1">Stereo Δ (C1-C0):</span><span style="color:#f43f5e;" class="me-1">● ΔAx</span><span style="color:#10b981;" class="me-1">● ΔAy</span><span style="color:#38bdf8;">● ΔAz (g)</span>';
       }
+
       drawImuMotionCanvas(currentFrame);
     }
 
@@ -2968,9 +3029,10 @@
             imuTelemetryLoaded = true;
 
             const feedSelector = document.getElementById('imuFeedSelector');
-            if (feedSelector && data.feed_name) {
+            if (feedSelector) {
+              const activeId = data.feed_name || (data.stereo_mode ? `${data.pair_id || 'pair1'}_stereo` : '');
               for (let opt of feedSelector.options) {
-                if (opt.value.toLowerCase() === data.feed_name.toLowerCase()) {
+                if (opt.value.toLowerCase() === activeId.toLowerCase()) {
                   feedSelector.value = opt.value;
                   break;
                 }
@@ -2979,8 +3041,10 @@
 
             const badge = document.getElementById('imuBadgeSource');
             if (badge) {
-              let srcLabel = '200 Hz DMP';
-              if (data.source && data.source.includes('OneDrive')) {
+              let srcLabel = '200 Hz Dual GPMF';
+              if (data.source && data.source.includes('Binocular Stereo')) {
+                srcLabel = 'Dual Cam GPMF';
+              } else if (data.source && data.source.includes('OneDrive')) {
                 srcLabel = 'Pure .MP4 GPMF';
               } else if (data.source && data.source.includes('Local MP4')) {
                 srcLabel = 'Local .MP4 GPMF';
@@ -3080,26 +3144,28 @@
         imuSequenceData.push({
           frame_index: i,
           timestamp_sec: Math.round(t * 10000) / 10000,
-          attitude: { pitch_deg: Math.round(pitch * 100) / 100, roll_deg: Math.round(roll * 100) / 100, yaw_deg: Math.round(yaw * 100) / 100 },
-          gyroscope: {
-            rate_pitch_dps: Math.round(d_pitch * 100) / 100,
-            rate_roll_dps: Math.round(d_roll * 100) / 100,
-            rate_yaw_dps: Math.round(d_yaw * 100) / 100,
-            x_dps: Math.round(d_roll * 100) / 100,
-            y_dps: Math.round(d_pitch * 100) / 100,
-            z_dps: Math.round(d_yaw * 100) / 100,
-            unit: "deg/s"
+          stereo_mode: true,
+          cam0: {
+            feed: "GX010077.MP4",
+            label: "Cam 0 (Left)",
+            attitude: { pitch_deg: Math.round(pitch * 100) / 100, roll_deg: Math.round(roll * 100) / 100, yaw_deg: Math.round(yaw * 100) / 100 },
+            gyroscope: { rate_pitch_dps: Math.round(d_pitch * 100) / 100, rate_roll_dps: Math.round(d_roll * 100) / 100, rate_yaw_dps: Math.round(d_yaw * 100) / 100, x_dps: Math.round(d_roll * 100) / 100, y_dps: Math.round(d_pitch * 100) / 100, z_dps: Math.round(d_yaw * 100) / 100, unit: "deg/s" },
+            accelerometer: { surge_ax_g: Math.round(ax * 1000) / 1000, sway_ay_g: Math.round(ay * 1000) / 1000, heave_az_g: Math.round(az * 1000) / 1000, x_g: Math.round(ax * 1000) / 1000, y_g: Math.round(ay * 1000) / 1000, z_g: Math.round(az * 1000) / 1000, total_g: Math.round(totA * 1000) / 1000, unit: "g (9.81 m/s²)" }
           },
-          accelerometer: {
-            surge_ax_g: Math.round(ax * 1000) / 1000,
-            sway_ay_g: Math.round(ay * 1000) / 1000,
-            heave_az_g: Math.round(az * 1000) / 1000,
-            x_g: Math.round(ax * 1000) / 1000,
-            y_g: Math.round(ay * 1000) / 1000,
-            z_g: Math.round(az * 1000) / 1000,
-            total_g: Math.round(totA * 1000) / 1000,
-            unit: "g (9.81 m/s²)"
-          }
+          cam1: {
+            feed: "GX011273.MP4",
+            label: "Cam 1 (Right)",
+            attitude: { pitch_deg: Math.round((pitch + 0.15) * 100) / 100, roll_deg: Math.round((roll - 0.2) * 100) / 100, yaw_deg: Math.round((yaw + 0.3) * 100) / 100 },
+            gyroscope: { rate_pitch_dps: Math.round((d_pitch * 1.02) * 100) / 100, rate_roll_dps: Math.round((d_roll * 0.98) * 100) / 100, rate_yaw_dps: Math.round((d_yaw * 1.05) * 100) / 100, x_dps: Math.round((d_roll * 0.98) * 100) / 100, y_dps: Math.round((d_pitch * 1.02) * 100) / 100, z_dps: Math.round((d_yaw * 1.05) * 100) / 100, unit: "deg/s" },
+            accelerometer: { surge_ax_g: Math.round((ax * 1.01) * 1000) / 1000, sway_ay_g: Math.round((ay * 0.99) * 1000) / 1000, heave_az_g: Math.round((az * 0.995) * 1000) / 1000, x_g: Math.round((ax * 1.01) * 1000) / 1000, y_g: Math.round((ay * 0.99) * 1000) / 1000, z_g: Math.round((az * 0.995) * 1000) / 1000, total_g: Math.round(totA * 1000) / 1000, unit: "g (9.81 m/s²)" }
+          },
+          baseline_differential: {
+            delta_gyro_dps: { x: Math.round((d_roll * -0.02) * 100) / 100, y: Math.round((d_pitch * 0.02) * 100) / 100, z: Math.round((d_yaw * 0.05) * 100) / 100, mag: 0.15 },
+            delta_accel_g: { x: 0.001, y: -0.001, z: -0.005, mag: 0.005 }
+          },
+          attitude: { pitch_deg: Math.round(pitch * 100) / 100, roll_deg: Math.round(roll * 100) / 100, yaw_deg: Math.round(yaw * 100) / 100 },
+          gyroscope: { rate_pitch_dps: Math.round(d_pitch * 100) / 100, rate_roll_dps: Math.round(d_roll * 100) / 100, rate_yaw_dps: Math.round(d_yaw * 100) / 100, x_dps: Math.round(d_roll * 100) / 100, y_dps: Math.round(d_pitch * 100) / 100, z_dps: Math.round(d_yaw * 100) / 100, unit: "deg/s" },
+          accelerometer: { surge_ax_g: Math.round(ax * 1000) / 1000, sway_ay_g: Math.round(ay * 1000) / 1000, heave_az_g: Math.round(az * 1000) / 1000, x_g: Math.round(ax * 1000) / 1000, y_g: Math.round(ay * 1000) / 1000, z_g: Math.round(az * 1000) / 1000, total_g: Math.round(totA * 1000) / 1000, unit: "g (9.81 m/s²)" }
         });
       }
     }
@@ -3118,37 +3184,112 @@
       const f = imuSequenceData[idx] || imuSequenceData[Math.min(idx, imuSequenceData.length - 1)];
       if (!f) return;
 
-      // 1. Raw 3-Axis Gyroscope (deg/s)
-      const gx = (f.gyroscope && typeof f.gyroscope.x_dps === 'number') ? f.gyroscope.x_dps : ((f.gyroscope && f.gyroscope.rate_roll_dps) || 0.0);
-      const gy = (f.gyroscope && typeof f.gyroscope.y_dps === 'number') ? f.gyroscope.y_dps : ((f.gyroscope && f.gyroscope.rate_pitch_dps) || 0.0);
-      const gz = (f.gyroscope && typeof f.gyroscope.z_dps === 'number') ? f.gyroscope.z_dps : ((f.gyroscope && f.gyroscope.rate_yaw_dps) || 0.0);
-      const totOmega = Math.sqrt(gx * gx + gy * gy + gz * gz);
+      // Extract Cam 0 readings
+      const c0 = f.cam0 || f;
+      const c0_g = c0.gyroscope || {};
+      const c0_gx = typeof c0_g.x_dps === 'number' ? c0_g.x_dps : (c0_g.rate_roll_dps || 0.0);
+      const c0_gy = typeof c0_g.y_dps === 'number' ? c0_g.y_dps : (c0_g.rate_pitch_dps || 0.0);
+      const c0_gz = typeof c0_g.z_dps === 'number' ? c0_g.z_dps : (c0_g.rate_yaw_dps || 0.0);
+      const c0_totOmega = Math.sqrt(c0_gx * c0_gx + c0_gy * c0_gy + c0_gz * c0_gz);
 
-      // 2. Raw 3-Axis Accelerometer (g)
-      const ax = (f.accelerometer && typeof f.accelerometer.x_g === 'number') ? f.accelerometer.x_g : ((f.accelerometer && f.accelerometer.surge_ax_g) || 0.0);
-      const ay = (f.accelerometer && typeof f.accelerometer.y_g === 'number') ? f.accelerometer.y_g : ((f.accelerometer && f.accelerometer.sway_ay_g) || 0.0);
-      const az = (f.accelerometer && typeof f.accelerometer.z_g === 'number') ? f.accelerometer.z_g : ((f.accelerometer && f.accelerometer.heave_az_g) || 1.0);
-      const totA = (f.accelerometer && typeof f.accelerometer.total_g === 'number') ? f.accelerometer.total_g : Math.sqrt(ax * ax + ay * ay + az * az);
+      const c0_a = c0.accelerometer || {};
+      const c0_ax = typeof c0_a.x_g === 'number' ? c0_a.x_g : (c0_a.surge_ax_g || 0.0);
+      const c0_ay = typeof c0_a.y_g === 'number' ? c0_a.y_g : (c0_a.sway_ay_g || 0.0);
+      const c0_az = typeof c0_a.z_g === 'number' ? c0_a.z_g : (c0_a.heave_az_g || 1.0);
+      const c0_totA = typeof c0_a.total_g === 'number' ? c0_a.total_g : Math.sqrt(c0_ax * c0_ax + c0_ay * c0_ay + c0_az * c0_az);
 
-      // DOM Gyroscope Updates (X, Y, Z)
+      // Extract Cam 1 readings
+      const c1 = f.cam1 || c0;
+      const c1_g = c1.gyroscope || {};
+      const c1_gx = typeof c1_g.x_dps === 'number' ? c1_g.x_dps : (c1_g.rate_roll_dps || 0.0);
+      const c1_gy = typeof c1_g.y_dps === 'number' ? c1_g.y_dps : (c1_g.rate_pitch_dps || 0.0);
+      const c1_gz = typeof c1_g.z_dps === 'number' ? c1_g.z_dps : (c1_g.rate_yaw_dps || 0.0);
+      const c1_totOmega = Math.sqrt(c1_gx * c1_gx + c1_gy * c1_gy + c1_gz * c1_gz);
+
+      const c1_a = c1.accelerometer || {};
+      const c1_ax = typeof c1_a.x_g === 'number' ? c1_a.x_g : (c1_a.surge_ax_g || 0.0);
+      const c1_ay = typeof c1_a.y_g === 'number' ? c1_a.y_g : (c1_a.sway_ay_g || 0.0);
+      const c1_az = typeof c1_a.z_g === 'number' ? c1_a.z_g : (c1_a.heave_az_g || 1.0);
+      const c1_totA = typeof c1_a.total_g === 'number' ? c1_a.total_g : Math.sqrt(c1_ax * c1_ax + c1_ay * c1_ay + c1_az * c1_az);
+
+      // Baseline differentials
+      const diffG = f.baseline_differential ? f.baseline_differential.delta_gyro_dps : {
+        x: c1_gx - c0_gx, y: c1_gy - c0_gy, z: c1_gz - c0_gz,
+        mag: Math.sqrt((c1_gx - c0_gx)**2 + (c1_gy - c0_gy)**2 + (c1_gz - c0_gz)**2)
+      };
+      const diffA = f.baseline_differential ? f.baseline_differential.delta_accel_g : {
+        x: c1_ax - c0_ax, y: c1_ay - c0_ay, z: c1_az - c0_az,
+        mag: Math.sqrt((c1_ax - c0_ax)**2 + (c1_ay - c0_ay)**2 + (c1_az - c0_az)**2)
+      };
+
+      // DOM Updates Cam 0
+      const c0_gxEl = document.getElementById('imuCam0GyroX');
+      if (c0_gxEl) c0_gxEl.innerText = `${c0_gx >= 0 ? '+' : ''}${c0_gx.toFixed(2)}`;
+      const c0_gyEl = document.getElementById('imuCam0GyroY');
+      if (c0_gyEl) c0_gyEl.innerText = `${c0_gy >= 0 ? '+' : ''}${c0_gy.toFixed(2)}`;
+      const c0_gzEl = document.getElementById('imuCam0GyroZ');
+      if (c0_gzEl) c0_gzEl.innerText = `${c0_gz >= 0 ? '+' : ''}${c0_gz.toFixed(2)}`;
+      const c0_gTotEl = document.getElementById('imuCam0GyroTotal');
+      if (c0_gTotEl) c0_gTotEl.innerText = `|ω|: ${c0_totOmega.toFixed(2)}°/s`;
+
+      const c0_axEl = document.getElementById('imuCam0AccelX');
+      if (c0_axEl) c0_axEl.innerText = `${c0_ax >= 0 ? '+' : ''}${c0_ax.toFixed(3)}`;
+      const c0_ayEl = document.getElementById('imuCam0AccelY');
+      if (c0_ayEl) c0_ayEl.innerText = `${c0_ay >= 0 ? '+' : ''}${c0_ay.toFixed(3)}`;
+      const c0_azEl = document.getElementById('imuCam0AccelZ');
+      if (c0_azEl) c0_azEl.innerText = `${c0_az >= 0 ? '+' : ''}${c0_az.toFixed(3)}`;
+      const c0_aTotEl = document.getElementById('imuCam0AccelTotal');
+      if (c0_aTotEl) c0_aTotEl.innerText = `|a|: ${c0_totA.toFixed(3)} g`;
+
+      // DOM Updates Cam 1
+      const c1_gxEl = document.getElementById('imuCam1GyroX');
+      if (c1_gxEl) c1_gxEl.innerText = `${c1_gx >= 0 ? '+' : ''}${c1_gx.toFixed(2)}`;
+      const c1_gyEl = document.getElementById('imuCam1GyroY');
+      if (c1_gyEl) c1_gyEl.innerText = `${c1_gy >= 0 ? '+' : ''}${c1_gy.toFixed(2)}`;
+      const c1_gzEl = document.getElementById('imuCam1GyroZ');
+      if (c1_gzEl) c1_gzEl.innerText = `${c1_gz >= 0 ? '+' : ''}${c1_gz.toFixed(2)}`;
+      const c1_gTotEl = document.getElementById('imuCam1GyroTotal');
+      if (c1_gTotEl) c1_gTotEl.innerText = `|ω|: ${c1_totOmega.toFixed(2)}°/s`;
+
+      const c1_axEl = document.getElementById('imuCam1AccelX');
+      if (c1_axEl) c1_axEl.innerText = `${c1_ax >= 0 ? '+' : ''}${c1_ax.toFixed(3)}`;
+      const c1_ayEl = document.getElementById('imuCam1AccelY');
+      if (c1_ayEl) c1_ayEl.innerText = `${c1_ay >= 0 ? '+' : ''}${c1_ay.toFixed(3)}`;
+      const c1_azEl = document.getElementById('imuCam1AccelZ');
+      if (c1_azEl) c1_azEl.innerText = `${c1_az >= 0 ? '+' : ''}${c1_az.toFixed(3)}`;
+      const c1_aTotEl = document.getElementById('imuCam1AccelTotal');
+      if (c1_aTotEl) c1_aTotEl.innerText = `|a|: ${c1_totA.toFixed(3)} g`;
+
+      // DOM Feed Labels
+      const c0FeedEl = document.getElementById('imuCam0Feed');
+      if (c0FeedEl && c0.feed) c0FeedEl.innerText = c0.feed.replace('.MP4', '');
+      const c1FeedEl = document.getElementById('imuCam1Feed');
+      if (c1FeedEl && c1.feed) c1FeedEl.innerText = c1.feed.replace('.MP4', '');
+
+      // Baseline Differential DOM Updates
+      const diffGEl = document.getElementById('imuDiffGyroMag');
+      if (diffGEl) diffGEl.innerText = `${(diffG.mag || 0).toFixed(2)}°/s`;
+      const diffAEl = document.getElementById('imuDiffAccelMag');
+      if (diffAEl) diffAEl.innerText = `${(diffA.mag || 0).toFixed(3)} g`;
+
+      // Legacy/backward-compatible single-cam DOM elements
       const gxEl = document.getElementById('imuGyroX');
-      if (gxEl) gxEl.innerText = `${gx >= 0 ? '+' : ''}${gx.toFixed(2)}`;
+      if (gxEl) gxEl.innerText = `${c0_gx >= 0 ? '+' : ''}${c0_gx.toFixed(2)}`;
       const gyEl = document.getElementById('imuGyroY');
-      if (gyEl) gyEl.innerText = `${gy >= 0 ? '+' : ''}${gy.toFixed(2)}`;
+      if (gyEl) gyEl.innerText = `${c0_gy >= 0 ? '+' : ''}${c0_gy.toFixed(2)}`;
       const gzEl = document.getElementById('imuGyroZ');
-      if (gzEl) gzEl.innerText = `${gz >= 0 ? '+' : ''}${gz.toFixed(2)}`;
+      if (gzEl) gzEl.innerText = `${c0_gz >= 0 ? '+' : ''}${c0_gz.toFixed(2)}`;
       const gTotEl = document.getElementById('imuGyroTotal');
-      if (gTotEl) gTotEl.innerText = `|ω|: ${totOmega.toFixed(2)}°/s`;
+      if (gTotEl) gTotEl.innerText = `|ω|: ${c0_totOmega.toFixed(2)}°/s`;
 
-      // DOM Accelerometer Updates (X, Y, Z)
       const axEl = document.getElementById('imuAccelX');
-      if (axEl) axEl.innerText = `${ax >= 0 ? '+' : ''}${ax.toFixed(3)}`;
+      if (axEl) axEl.innerText = `${c0_ax >= 0 ? '+' : ''}${c0_ax.toFixed(3)}`;
       const ayEl = document.getElementById('imuAccelY');
-      if (ayEl) ayEl.innerText = `${ay >= 0 ? '+' : ''}${ay.toFixed(3)}`;
+      if (ayEl) ayEl.innerText = `${c0_ay >= 0 ? '+' : ''}${c0_ay.toFixed(3)}`;
       const azEl = document.getElementById('imuAccelZ');
-      if (azEl) azEl.innerText = `${az >= 0 ? '+' : ''}${az.toFixed(3)}`;
+      if (azEl) azEl.innerText = `${c0_az >= 0 ? '+' : ''}${c0_az.toFixed(3)}`;
       const aTotEl = document.getElementById('imuAccelTotal');
-      if (aTotEl) aTotEl.innerText = `|a|: ${totA.toFixed(3)} g`;
+      if (aTotEl) aTotEl.innerText = `|a|: ${c0_totA.toFixed(3)} g`;
 
       // Synchronize frame progress text with actual sequence span
       const totalSpan = Math.max(
@@ -3166,7 +3307,6 @@
     function drawImuMotionCanvas(curIdx) {
       if (!imuSequenceData || !imuSequenceData.length) return;
 
-      // The true total span accommodating all active and streaming frames
       const totalSpan = Math.max(
         typeof totalFrames === 'number' ? totalFrames : 0,
         imuSequenceData.length,
@@ -3174,20 +3314,17 @@
         10
       );
 
-      // If playing past current imuSequenceData, dynamically synthesize future kinematics
       if (curIdx >= imuSequenceData.length) {
         extendImuSequenceUpTo(curIdx + 60);
       }
 
       const clampedCur = Math.max(0, Math.min(curIdx, totalSpan - 1));
 
-      // 1. Gyroscope 3-Axis Canvas
       const gyroCvs = document.getElementById('imuGyroCanvas');
       if (gyroCvs && (!gyroCvs.parentElement || !gyroCvs.parentElement.classList.contains('d-none'))) {
         draw3AxisCanvas(gyroCvs, 'gyro', clampedCur, totalSpan);
       }
 
-      // 2. Accelerometer 3-Axis Canvas
       const accelCvs = document.getElementById('imuAccelCanvas');
       if (accelCvs && (!accelCvs.parentElement || !accelCvs.parentElement.classList.contains('d-none'))) {
         draw3AxisCanvas(accelCvs, 'accel', clampedCur, totalSpan);
@@ -3203,7 +3340,7 @@
 
       const midY = h / 2;
 
-      // 1. Future/unreached timeline dashed baseline across full width (shows pending frames)
+      // 1. Future/unreached timeline dashed baseline across full width
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 4]);
@@ -3231,48 +3368,115 @@
       const maxScale = channelType === 'gyro' ? 14.0 : 0.35;
       const scaleY = (val) => midY - (val / maxScale) * (midY * 0.85);
 
-      const colors = {
-        x: '#f43f5e', // Coral Red (X: Roll / Surge)
-        y: '#10b981', // Emerald Green (Y: Pitch / Sway)
-        z: '#38bdf8'  // Sky Blue (Z: Yaw / Heave)
-      };
-
-      function getSample(i) {
+      function getCam0Sample(i) {
         const item = imuSequenceData[Math.min(i, imuSequenceData.length - 1)];
         if (!item) return { x: 0, y: 0, z: 0 };
+        const c = item.cam0 || item;
         if (channelType === 'gyro') {
-          const g = item.gyroscope || {};
+          const g = c.gyroscope || {};
           return {
             x: typeof g.x_dps === 'number' ? g.x_dps : (g.rate_roll_dps || 0.0),
             y: typeof g.y_dps === 'number' ? g.y_dps : (g.rate_pitch_dps || 0.0),
             z: typeof g.z_dps === 'number' ? g.z_dps : (g.rate_yaw_dps || 0.0)
           };
         } else {
-          const a = item.accelerometer || {};
+          const a = c.accelerometer || {};
           const azRaw = typeof a.z_g === 'number' ? a.z_g : (a.heave_az_g || 1.0);
           return {
             x: typeof a.x_g === 'number' ? a.x_g : (a.surge_ax_g || 0.0),
             y: typeof a.y_g === 'number' ? a.y_g : (a.sway_ay_g || 0.0),
-            z: azRaw - 1.0 // Centered dynamic wave heave perturbation around 0g
+            z: azRaw - 1.0
           };
         }
       }
 
-      // 3. Draw all 3 orthogonal axes strictly from Frame 0 up to clampedCur (Progressive Stream)
-      ['x', 'y', 'z'].forEach(axis => {
-        ctx.strokeStyle = colors[axis];
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        for (let i = 0; i <= clampedCur; i++) {
-          const x = (i / (totalSpan - 1)) * w;
-          const val = getSample(i)[axis];
-          const y = Math.max(2, Math.min(h - 2, scaleY(val)));
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      function getCam1Sample(i) {
+        const item = imuSequenceData[Math.min(i, imuSequenceData.length - 1)];
+        if (!item) return { x: 0, y: 0, z: 0 };
+        const c = item.cam1 || item.cam0 || item;
+        if (channelType === 'gyro') {
+          const g = c.gyroscope || {};
+          return {
+            x: typeof g.x_dps === 'number' ? g.x_dps : (g.rate_roll_dps || 0.0),
+            y: typeof g.y_dps === 'number' ? g.y_dps : (g.rate_pitch_dps || 0.0),
+            z: typeof g.z_dps === 'number' ? g.z_dps : (g.rate_yaw_dps || 0.0)
+          };
+        } else {
+          const a = c.accelerometer || {};
+          const azRaw = typeof a.z_g === 'number' ? a.z_g : (a.heave_az_g || 1.0);
+          return {
+            x: typeof a.x_g === 'number' ? a.x_g : (a.surge_ax_g || 0.0),
+            y: typeof a.y_g === 'number' ? a.y_g : (a.sway_ay_g || 0.0),
+            z: azRaw - 1.0
+          };
         }
-        ctx.stroke();
-      });
+      }
 
-      // 4. Leading playhead vertical cursor at curX
+      function getDiffSample(i) {
+        const s0 = getCam0Sample(i);
+        const s1 = getCam1Sample(i);
+        return {
+          x: s1.x - s0.x,
+          y: s1.y - s0.y,
+          z: s1.z - s0.z
+        };
+      }
+
+      const colorsCam0 = {
+        x: '#f43f5e', // Coral Red (X)
+        y: '#10b981', // Emerald Green (Y)
+        z: '#38bdf8'  // Sky Blue (Z)
+      };
+
+      const colorsCam1 = {
+        x: '#fb7185', // Soft Rose (X)
+        y: '#34d399', // Mint Green (Y)
+        z: '#7dd3fc'  // Light Sky (Z)
+      };
+
+      const colorsDiff = {
+        x: '#f59e0b', // Amber (ΔX)
+        y: '#ec4899', // Pink (ΔY)
+        z: '#06b6d4'  // Cyan (ΔZ)
+      };
+
+      // Helper to draw a single 3-axis trace set
+      function drawTraces(getSampleFn, colorMap, isDashed = false, lw = 1.4) {
+        if (isDashed) {
+          ctx.setLineDash([3, 2]);
+        } else {
+          ctx.setLineDash([]);
+        }
+        ctx.lineWidth = lw;
+
+        ['x', 'y', 'z'].forEach(axis => {
+          ctx.strokeStyle = colorMap[axis];
+          ctx.beginPath();
+          for (let i = 0; i <= clampedCur; i++) {
+            const x = (i / (totalSpan - 1)) * w;
+            const val = getSampleFn(i)[axis];
+            const y = Math.max(2, Math.min(h - 2, scaleY(val)));
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        });
+        ctx.setLineDash([]);
+      }
+
+      // Draw according to mode
+      if (imuGraphMode === 'cam0') {
+        drawTraces(getCam0Sample, colorsCam0, false, 1.4);
+      } else if (imuGraphMode === 'cam1') {
+        drawTraces(getCam1Sample, colorsCam1, false, 1.4);
+      } else if (imuGraphMode === 'diff') {
+        drawTraces(getDiffSample, colorsDiff, false, 1.4);
+      } else {
+        // Dual Overlay mode: Cam 0 in solid, Cam 1 in dashed
+        drawTraces(getCam0Sample, colorsCam0, false, 1.4);
+        drawTraces(getCam1Sample, colorsCam1, true, 1.3);
+      }
+
+      // Leading playhead vertical cursor
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -3280,15 +3484,53 @@
       ctx.lineTo(curX, h);
       ctx.stroke();
 
-      // 5. Leading glow cursor dots on all 3 axes at the current frontier
-      const curSample = getSample(clampedCur);
-      ['x', 'y', 'z'].forEach(axis => {
-        const dotY = Math.max(3, Math.min(h - 3, scaleY(curSample[axis])));
-        ctx.fillStyle = colors[axis];
-        ctx.beginPath();
-        ctx.arc(curX, dotY, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      // Leading glow cursor dots
+      if (imuGraphMode === 'cam0') {
+        const cur0 = getCam0Sample(clampedCur);
+        ['x', 'y', 'z'].forEach(axis => {
+          const dotY = Math.max(3, Math.min(h - 3, scaleY(cur0[axis])));
+          ctx.fillStyle = colorsCam0[axis];
+          ctx.beginPath();
+          ctx.arc(curX, dotY, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else if (imuGraphMode === 'cam1') {
+        const cur1 = getCam1Sample(clampedCur);
+        ['x', 'y', 'z'].forEach(axis => {
+          const dotY = Math.max(3, Math.min(h - 3, scaleY(cur1[axis])));
+          ctx.fillStyle = colorsCam1[axis];
+          ctx.beginPath();
+          ctx.arc(curX, dotY, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else if (imuGraphMode === 'diff') {
+        const curDiff = getDiffSample(clampedCur);
+        ['x', 'y', 'z'].forEach(axis => {
+          const dotY = Math.max(3, Math.min(h - 3, scaleY(curDiff[axis])));
+          ctx.fillStyle = colorsDiff[axis];
+          ctx.beginPath();
+          ctx.arc(curX, dotY, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // Dual overlay dots
+        const cur0 = getCam0Sample(clampedCur);
+        const cur1 = getCam1Sample(clampedCur);
+        ['x', 'y', 'z'].forEach(axis => {
+          const dotY0 = Math.max(3, Math.min(h - 3, scaleY(cur0[axis])));
+          ctx.fillStyle = colorsCam0[axis];
+          ctx.beginPath();
+          ctx.arc(curX, dotY0, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          const dotY1 = Math.max(3, Math.min(h - 3, scaleY(cur1[axis])));
+          ctx.strokeStyle = colorsCam1[axis];
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(curX, dotY1, 3.2, 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      }
     }
 
     async function exportCurrentFrameImuCsv() {

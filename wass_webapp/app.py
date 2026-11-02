@@ -1718,7 +1718,7 @@ def get_imu_telemetry(feed: str = Query(None), force: bool = Query(False)):
             except Exception:
                 pass
 
-        feed_to_use = feed or pipeline_state.get("active_imu_feed", "GX010077.MP4")
+        feed_to_use = feed or pipeline_state.get("active_imu_feed", "pair1_stereo")
         telemetry = get_or_extract_sequence_imu(
             seq_dir,
             total_frames=total_frames,
@@ -1739,7 +1739,7 @@ def get_available_imu_feeds():
     try:
         from wass_webapp.gopro_imu import list_available_gopro_feeds
         feeds = list_available_gopro_feeds(uploads_dir=UPLOAD_DIR)
-        active_feed = pipeline_state.get("active_imu_feed", "GX010077.MP4")
+        active_feed = pipeline_state.get("active_imu_feed", "pair1_stereo")
         for f in feeds:
             f["is_active"] = (f["id"].lower() == active_feed.lower())
         return JSONResponse({
@@ -1753,8 +1753,8 @@ def get_available_imu_feeds():
 @app.post("/api/telemetry/imu/select_feed")
 async def select_active_imu_feed(request: Request):
     """
-    Switches active sequence IMU telemetry to any specified camera feed.
-    Body: {"feed": "GX011273.MP4"} or form data.
+    Switches active sequence IMU telemetry to any specified camera feed or stereo pair.
+    Body: {"feed": "pair1_stereo"} or {"feed": "GX011273.MP4"}
     """
     try:
         data = {}
@@ -1764,7 +1764,7 @@ async def select_active_imu_feed(request: Request):
             form = await request.form()
             data = dict(form)
 
-        feed_id = data.get("feed") or data.get("feed_id") or "GX010077.MP4"
+        feed_id = data.get("feed") or data.get("feed_id") or "pair1_stereo"
         seq_dir = os.path.join(WORK_DIR, "sequence")
 
         total_frames = 150

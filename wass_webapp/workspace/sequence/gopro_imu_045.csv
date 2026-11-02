@@ -1,2 +1,2 @@
-frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g
-45,4.5000,-0.43,1.46,-8.30,8.44,0.855,0.008,0.343,0.921
+frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g,delta_gyro_mag_dps,delta_accel_mag_g
+45,4.5000,-0.43,1.46,-8.30,8.44,0.855,0.008,0.343,0.921,-0.43,1.46,-8.30,0.855,0.008,0.343,-3.11,-0.73,6.53,0.916,0.182,0.230,15.23,0.216

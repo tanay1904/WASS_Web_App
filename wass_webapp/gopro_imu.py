@@ -181,47 +181,75 @@ def generate_wave_coupled_imu_series(total_frames=150, fps=30.0, base_hs=2.56, p
 
 KNOWN_CAMERA_FEEDS = [
     {
+        "id": "pair1_stereo",
+        "name": "★ Stereo Rig: Pair 1 (Cam 0 + Cam 1)",
+        "video": "GX010077.MP4+GX011273.MP4",
+        "pair": "pair1",
+        "camera": "stereo",
+        "channel": "Binocular Stereo Rig",
+        "resolution": "4K Dual Stereo (3840x2160 x2)",
+        "sample_rate_hz": 200,
+        "is_stereo": True,
+        "description": "GoPro HERO Synchronized Stereo Rig (Cam0: GX010077 Left, Cam1: GX011273 Right)"
+    },
+    {
+        "id": "pair2_stereo",
+        "name": "★ Stereo Rig: Pair 2 (Cam 0 + Cam 1)",
+        "video": "GX010078.MP4+GX011274.MP4",
+        "pair": "pair2",
+        "camera": "stereo",
+        "channel": "Binocular Stereo Rig",
+        "resolution": "4K Dual Stereo (3840x2160 x2)",
+        "sample_rate_hz": 200,
+        "is_stereo": True,
+        "description": "GoPro HERO Synchronized Stereo Rig (Cam0: GX010078 Left, Cam1: GX011274 Right)"
+    },
+    {
         "id": "GX010077.MP4",
-        "name": "Cam 0: Left (Pair 1)",
+        "name": "Cam 0: Left (Pair 1 - GX010077)",
         "video": "GX010077.MP4",
         "pair": "pair1",
         "camera": "cam0",
         "channel": "Cam 0 (Left)",
         "resolution": "4K (3840x2160)",
         "sample_rate_hz": 200,
+        "is_stereo": False,
         "description": "GoPro HERO Cam 0 Left (Pair 1 - Baseline)"
     },
     {
         "id": "GX011273.MP4",
-        "name": "Cam 1: Right (Pair 1)",
+        "name": "Cam 1: Right (Pair 1 - GX011273)",
         "video": "GX011273.MP4",
         "pair": "pair1",
         "camera": "cam1",
         "channel": "Cam 1 (Right)",
         "resolution": "4K (3840x2160)",
         "sample_rate_hz": 200,
+        "is_stereo": False,
         "description": "GoPro HERO Cam 1 Right (Pair 1)"
     },
     {
         "id": "GX010078.MP4",
-        "name": "Cam 0: Left (Pair 2)",
+        "name": "Cam 0: Left (Pair 2 - GX010078)",
         "video": "GX010078.MP4",
         "pair": "pair2",
         "camera": "cam0",
         "channel": "Cam 0 (Left)",
         "resolution": "4K (3840x2160)",
         "sample_rate_hz": 200,
+        "is_stereo": False,
         "description": "GoPro HERO Cam 0 Left (Pair 2)"
     },
     {
         "id": "GX011274.MP4",
-        "name": "Cam 1: Right (Pair 2)",
+        "name": "Cam 1: Right (Pair 2 - GX011274)",
         "video": "GX011274.MP4",
         "pair": "pair2",
         "camera": "cam1",
         "channel": "Cam 1 (Right)",
         "resolution": "4K (3840x2160)",
         "sample_rate_hz": 200,
+        "is_stereo": False,
         "description": "GoPro HERO Cam 1 Right (Pair 2)"
     }
 ]
@@ -589,7 +617,7 @@ def fetch_gopro_imu_from_onedrive_mp4(total_frames=150, fps=10.0, video_name="GX
         return None
 
 
-def get_or_extract_sequence_imu(
+def get_or_extract_single_feed_imu(
     sequence_dir,
     total_frames=150,
     fps=10.0,
@@ -598,11 +626,8 @@ def get_or_extract_sequence_imu(
     force_refresh=False
 ):
     """
-    Retrieves or generates the synchronized GoPro IMU sequence for any camera feed.
-    Supports all 4 stereo video feeds on OneDrive (GX010077, GX011273, GX010078, GX011274)
-    and any locally uploaded MP4 videos.
-    Caches results per feed to workspace/sequence/gopro_imu_telemetry_{clean_feed}.json,
-    and updates active workspace/sequence/gopro_imu_telemetry.json.
+    Retrieves or extracts IMU telemetry for a single physical camera feed (e.g. GX010077, GX011273).
+    Caches to workspace/sequence/gopro_imu_telemetry_{clean_feed}.json.
     """
     os.makedirs(sequence_dir, exist_ok=True)
 
@@ -613,7 +638,6 @@ def get_or_extract_sequence_imu(
         clean_feed = "GX010077.MP4"
 
     feed_telemetry_file = os.path.join(sequence_dir, f"gopro_imu_telemetry_{clean_feed}.json")
-    default_telemetry_file = os.path.join(sequence_dir, "gopro_imu_telemetry.json")
 
     # 1. Check if feed-specific cache exists
     if os.path.exists(feed_telemetry_file) and not force_refresh:
@@ -623,19 +647,6 @@ def get_or_extract_sequence_imu(
             is_genuine = cached.get("source", "").startswith("GoPro HERO GPMF")
             if is_genuine and isinstance(cached, dict) and "frames" in cached and len(cached["frames"]) >= total_frames:
                 return cached
-        except Exception:
-            pass
-
-    # 2. Check if default sequence telemetry file happens to match this exact feed
-    if os.path.exists(default_telemetry_file) and not force_refresh:
-        try:
-            with open(default_telemetry_file, "r", encoding="utf-8") as f:
-                cached = json.load(f)
-            is_genuine = cached.get("source", "").startswith("GoPro HERO GPMF")
-            cached_feed = cached.get("feed_name", "")
-            if is_genuine and isinstance(cached, dict) and "frames" in cached and len(cached["frames"]) >= total_frames:
-                if cached_feed and cached_feed.lower() == clean_feed.lower():
-                    return cached
         except Exception:
             pass
 
@@ -724,7 +735,7 @@ def get_or_extract_sequence_imu(
         extracted_series = generate_wave_coupled_imu_series(total_frames=total_frames, fps=fps, base_hs=base_hs)
 
     payload = {
-        "device": f"GoPro HERO Binocular IMU ({clean_feed})",
+        "device": f"GoPro HERO Single Camera IMU ({clean_feed})",
         "sample_rate_hz": 200,
         "video_fps": fps,
         "total_frames": len(extracted_series),
@@ -734,25 +745,216 @@ def get_or_extract_sequence_imu(
     }
 
     try:
-        # Save to feed-specific cache
         with open(feed_telemetry_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
-        # Also update the primary active sequence telemetry file
-        with open(default_telemetry_file, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-        # Generate unified sequence CSV and per-frame CSV files
-        export_all_frames_imu_csv(sequence_dir, imu_payload=payload)
     except Exception as e:
         print(f"[GoPro IMU] Could not cache {feed_telemetry_file}: {e}")
 
     return payload
 
 
-def switch_sequence_imu_feed(sequence_dir, video_source="GX010077.MP4", total_frames=840, fps=10.0):
+def get_or_extract_binocular_stereo_imu(
+    sequence_dir,
+    pair="pair1",
+    total_frames=840,
+    fps=10.0,
+    force_refresh=False
+):
     """
-    Dynamically switches the active workspace IMU telemetry to any specified camera feed.
-    Extracts or retrieves cached GPMF for the requested feed, synchronizes sequence-wide
-    and per-frame CSV exports, and updates all annotated_points and circular_arcs CSVs.
+    Extracts and synchronizes physical IMU telemetry for both stereo cameras simultaneously:
+    Cam 0 (Left) and Cam 1 (Right), computing baseline differential rotation and linear acceleration.
+    """
+    os.makedirs(sequence_dir, exist_ok=True)
+    pair_lower = str(pair).lower()
+    if "pair2" in pair_lower:
+        pair_id = "pair2"
+        cam0_name = "GX010078.MP4"
+        cam1_name = "GX011274.MP4"
+    else:
+        pair_id = "pair1"
+        cam0_name = "GX010077.MP4"
+        cam1_name = "GX011273.MP4"
+
+    stereo_cache_file = os.path.join(sequence_dir, f"gopro_imu_binocular_{pair_id}.json")
+    default_telemetry_file = os.path.join(sequence_dir, "gopro_imu_telemetry.json")
+
+    if os.path.exists(stereo_cache_file) and not force_refresh:
+        try:
+            with open(stereo_cache_file, "r", encoding="utf-8") as f:
+                cached = json.load(f)
+            if cached.get("stereo_mode") and len(cached.get("frames", [])) >= total_frames:
+                return cached
+        except Exception:
+            pass
+
+    # Retrieve individual camera telemetry
+    p0 = get_or_extract_single_feed_imu(sequence_dir, video_source=cam0_name, total_frames=total_frames, fps=fps, force_refresh=force_refresh)
+    p1 = get_or_extract_single_feed_imu(sequence_dir, video_source=cam1_name, total_frames=total_frames, fps=fps, force_refresh=force_refresh)
+
+    f0_list = p0.get("frames", [])
+    f1_list = p1.get("frames", [])
+    n_frames = max(len(f0_list), len(f1_list), total_frames)
+
+    combined_frames = []
+    for idx in range(n_frames):
+        c0 = f0_list[idx] if idx < len(f0_list) else (f0_list[-1] if f0_list else {})
+        c1 = f1_list[idx] if idx < len(f1_list) else (f1_list[-1] if f1_list else {})
+
+        s0 = extract_frame_imu_scalars(c0)
+        s1 = extract_frame_imu_scalars(c1)
+
+        t_sec = c0.get("timestamp_sec", round(float(idx) / float(fps), 4))
+
+        att0 = c0.get("attitude", {"pitch_deg": 0.0, "roll_deg": 0.0, "yaw_deg": 0.0})
+        att1 = c1.get("attitude", {"pitch_deg": 0.0, "roll_deg": 0.0, "yaw_deg": 0.0})
+
+        # Angular rate differentials
+        dgx = round(s1["gyro_x_dps"] - s0["gyro_x_dps"], 2)
+        dgy = round(s1["gyro_y_dps"] - s0["gyro_y_dps"], 2)
+        dgz = round(s1["gyro_z_dps"] - s0["gyro_z_dps"], 2)
+        dg_mag = round(math.sqrt(dgx**2 + dgy**2 + dgz**2), 2)
+
+        # Linear acceleration differentials
+        dax = round(s1["accel_x_g"] - s0["accel_x_g"], 3)
+        day = round(s1["accel_y_g"] - s0["accel_y_g"], 3)
+        daz = round(s1["accel_z_g"] - s0["accel_z_g"], 3)
+        da_mag = round(math.sqrt(dax**2 + day**2 + daz**2), 3)
+
+        # Relative attitude
+        dpitch = round(float(att1.get("pitch_deg", 0.0)) - float(att0.get("pitch_deg", 0.0)), 2)
+        droll = round(float(att1.get("roll_deg", 0.0)) - float(att0.get("roll_deg", 0.0)), 2)
+        dyaw = round(float(att1.get("yaw_deg", 0.0)) - float(att0.get("yaw_deg", 0.0)), 2)
+
+        # Fused Rig Average
+        mean_gx = round((s0["gyro_x_dps"] + s1["gyro_x_dps"]) / 2.0, 2)
+        mean_gy = round((s0["gyro_y_dps"] + s1["gyro_y_dps"]) / 2.0, 2)
+        mean_gz = round((s0["gyro_z_dps"] + s1["gyro_z_dps"]) / 2.0, 2)
+        mean_ax = round((s0["accel_x_g"] + s1["accel_x_g"]) / 2.0, 3)
+        mean_ay = round((s0["accel_y_g"] + s1["accel_y_g"]) / 2.0, 3)
+        mean_az = round((s0["accel_z_g"] + s1["accel_z_g"]) / 2.0, 3)
+
+        frame_entry = {
+            "frame_index": idx,
+            "timestamp_sec": t_sec,
+            "stereo_mode": True,
+            "cam0": {
+                "feed": cam0_name,
+                "label": f"Cam 0 (Left - {cam0_name})",
+                "attitude": att0,
+                "gyroscope": c0.get("gyroscope", {}),
+                "accelerometer": c0.get("accelerometer", {})
+            },
+            "cam1": {
+                "feed": cam1_name,
+                "label": f"Cam 1 (Right - {cam1_name})",
+                "attitude": att1,
+                "gyroscope": c1.get("gyroscope", {}),
+                "accelerometer": c1.get("accelerometer", {})
+            },
+            "baseline_differential": {
+                "delta_gyro_dps": {"x": dgx, "y": dgy, "z": dgz, "mag": dg_mag},
+                "delta_accel_g": {"x": dax, "y": day, "z": daz, "mag": da_mag},
+                "relative_attitude_deg": {"delta_pitch": dpitch, "delta_roll": droll, "delta_yaw": dyaw}
+            },
+            "fused_rig": {
+                "gyroscope": {"x_dps": mean_gx, "y_dps": mean_gy, "z_dps": mean_gz, "unit": "deg/s"},
+                "accelerometer": {"x_g": mean_ax, "y_g": mean_ay, "z_g": mean_az, "total_g": round(math.sqrt(mean_ax**2 + mean_ay**2 + mean_az**2), 3), "unit": "g (9.81 m/s²)"}
+            },
+            # Top-level backward compatibility:
+            "attitude": att0,
+            "gyroscope": c0.get("gyroscope", {}),
+            "accelerometer": c0.get("accelerometer", {}),
+            "source": f"GoPro HERO GPMF Binocular Stereo Rig ({cam0_name} Left + {cam1_name} Right)"
+        }
+        combined_frames.append(frame_entry)
+
+    payload = {
+        "device": "GoPro HERO Binocular Dual-IMU Rig (ICM-20689)",
+        "pair_id": pair_id,
+        "stereo_mode": True,
+        "cam0_feed": cam0_name,
+        "cam1_feed": cam1_name,
+        "feed_name": f"{cam0_name}+{cam1_name}",
+        "sample_rate_hz": 200,
+        "video_fps": fps,
+        "total_frames": len(combined_frames),
+        "source": f"GoPro HERO GPMF Binocular Stereo Rig ({cam0_name} Left + {cam1_name} Right)",
+        "frames": combined_frames
+    }
+
+    try:
+        with open(stereo_cache_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        # Update default telemetry cache
+        with open(default_telemetry_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        export_all_frames_imu_csv(sequence_dir, imu_payload=payload)
+    except Exception as e:
+        print(f"[GoPro IMU] Could not cache stereo telemetry: {e}")
+
+    return payload
+
+
+def get_or_extract_sequence_imu(
+    sequence_dir,
+    total_frames=150,
+    fps=10.0,
+    video_source="pair1_stereo",
+    video_path=None,
+    force_refresh=False
+):
+    """
+    Retrieves or generates synchronized GoPro IMU sequence for binocular stereo rig or single camera feeds.
+    When video_source is 'pair1_stereo', 'pair2_stereo', None, or starts with 'pair', combines both stereo cameras.
+    When video_source is a single video (e.g. GX010077.MP4, GX011273.MP4), retrieves that camera's telemetry.
+    """
+    v_src = (video_source or "").lower().strip()
+
+    # Stereo rig routing
+    if not v_src or v_src in ["stereo", "binocular", "both", "dual", "pair1_stereo", "pair1", "default"]:
+        return get_or_extract_binocular_stereo_imu(
+            sequence_dir,
+            pair="pair1",
+            total_frames=max(840, total_frames),
+            fps=fps,
+            force_refresh=force_refresh
+        )
+    if v_src in ["pair2_stereo", "pair2"]:
+        return get_or_extract_binocular_stereo_imu(
+            sequence_dir,
+            pair="pair2",
+            total_frames=max(840, total_frames),
+            fps=fps,
+            force_refresh=force_refresh
+        )
+
+    # Single camera feed
+    payload = get_or_extract_single_feed_imu(
+        sequence_dir=sequence_dir,
+        total_frames=total_frames,
+        fps=fps,
+        video_source=video_source,
+        video_path=video_path,
+        force_refresh=force_refresh
+    )
+
+    # Update default sequence cache and CSVs with this feed
+    default_telemetry_file = os.path.join(sequence_dir, "gopro_imu_telemetry.json")
+    try:
+        with open(default_telemetry_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        export_all_frames_imu_csv(sequence_dir, imu_payload=payload)
+    except Exception as e:
+        print(f"[GoPro IMU] Cache update note: {e}")
+
+    return payload
+
+
+def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_frames=840, fps=10.0):
+    """
+    Dynamically switches the active workspace IMU telemetry to any specified camera feed or stereo rig.
+    Extracts or retrieves cached GPMF, synchronizes sequence-wide and per-frame CSV exports,
+    and updates all annotated_points and circular_arcs CSVs.
     """
     payload = get_or_extract_sequence_imu(
         sequence_dir=sequence_dir,
@@ -773,7 +975,19 @@ def switch_sequence_imu_feed(sequence_dir, video_source="GX010077.MP4", total_fr
         s = extract_frame_imu_scalars(f_entry)
         gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
         ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
-        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+
+        if s.get("is_stereo"):
+            c0_gx, c0_gy, c0_gz = s['cam0_gyro_x_dps'], s['cam0_gyro_y_dps'], s['cam0_gyro_z_dps']
+            c0_ax, c0_ay, c0_az = s['cam0_accel_x_g'], s['cam0_accel_y_g'], s['cam0_accel_z_g']
+            c1_gx, c1_gy, c1_gz = s['cam1_gyro_x_dps'], s['cam1_gyro_y_dps'], s['cam1_gyro_z_dps']
+            c1_ax, c1_ay, c1_az = s['cam1_accel_x_g'], s['cam1_accel_y_g'], s['cam1_accel_z_g']
+            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f},{c0_gx:.2f},{c0_gy:.2f},{c0_gz:.2f},{c0_ax:.3f},{c0_ay:.3f},{c0_az:.3f},{c1_gx:.2f},{c1_gy:.2f},{c1_gz:.2f},{c1_ax:.3f},{c1_ay:.3f},{c1_az:.3f}\n"
+            ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g\n"
+            arc_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g\n"
+        else:
+            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+            ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+            arc_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
 
         ann_path = os.path.join(sequence_dir, f"annotated_points_{idx:03d}.csv")
         if os.path.exists(ann_path):
@@ -781,7 +995,7 @@ def switch_sequence_imu_feed(sequence_dir, video_source="GX010077.MP4", total_fr
                 with open(ann_path, "r", encoding="utf-8") as af:
                     lines = af.readlines()
                 if lines:
-                    new_lines = ["x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"]
+                    new_lines = [ann_header]
                     for line in lines[1:]:
                         parts = line.strip().split(",")[:5]
                         new_lines.append(",".join(parts) + imu_suffix)
@@ -796,7 +1010,7 @@ def switch_sequence_imu_feed(sequence_dir, video_source="GX010077.MP4", total_fr
                 with open(arc_path, "r", encoding="utf-8") as arcf:
                     lines = arcf.readlines()
                 if lines:
-                    new_lines = ["frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"]
+                    new_lines = [arc_header]
                     for line in lines[1:]:
                         parts = line.strip().split(",")[:7]
                         new_lines.append(",".join(parts) + imu_suffix)
@@ -806,131 +1020,63 @@ def switch_sequence_imu_feed(sequence_dir, video_source="GX010077.MP4", total_fr
                 pass
 
     return payload
-    if video_path and os.path.exists(video_path):
-        raw_out = os.path.join(sequence_dir, "raw_gopro_imu.json")
-        success, msg = extract_gopro_imu_via_cli(video_path, raw_out)
-        if success:
-            parsed = parse_goimuex_json(raw_out)
-            if parsed and parsed.get("accl") and parsed.get("gyro"):
-                accl = parsed["accl"]
-                gyro = parsed["gyro"]
-                extracted_series = []
-                for idx in range(total_frames):
-                    t_target_ms = (float(idx) / float(fps)) * 1000.0
-                    a_val = [0.0, 0.0, 1.0]
-                    for s in accl:
-                        if s.get("cts", 0) >= t_target_ms:
-                            a_val = s.get("value", [0.0, 0.0, 1.0])
-                            break
-                    g_val = [0.0, 0.0, 0.0]
-                    for s in gyro:
-                        if s.get("cts", 0) >= t_target_ms:
-                            g_val = s.get("value", [0.0, 0.0, 0.0])
-                            break
-
-                    ax_g = a_val[0] / 9.80665 if abs(a_val[0]) > 2.0 else a_val[0]
-                    ay_g = a_val[1] / 9.80665 if abs(a_val[1]) > 2.0 else a_val[1]
-                    az_g = a_val[2] / 9.80665 if abs(a_val[2]) > 2.0 else a_val[2]
-                    tot_g = math.sqrt(ax_g**2 + ay_g**2 + az_g**2)
-
-                    pitch = math.degrees(math.atan2(ax_g, math.sqrt(ay_g**2 + az_g**2)))
-                    roll = math.degrees(math.atan2(-ay_g, az_g))
-
-                    extracted_series.append({
-                        "frame_index": idx,
-                        "timestamp_sec": round(t_target_ms / 1000.0, 4),
-                        "attitude": {
-                            "pitch_deg": round(pitch, 2),
-                            "roll_deg": round(roll, 2),
-                            "yaw_deg": 0.0
-                        },
-                        "gyroscope": {
-                            "rate_pitch_dps": round(float(g_val[1]), 2),
-                            "rate_roll_dps": round(float(g_val[0]), 2),
-                            "rate_yaw_dps": round(float(g_val[2]), 2),
-                            "x_dps": round(float(g_val[0]), 2),
-                            "y_dps": round(float(g_val[1]), 2),
-                            "z_dps": round(float(g_val[2]), 2),
-                            "unit": "deg/s"
-                        },
-                        "accelerometer": {
-                            "surge_ax_g": round(ax_g, 3),
-                            "sway_ay_g": round(ay_g, 3),
-                            "heave_az_g": round(az_g, 3),
-                            "x_g": round(ax_g, 3),
-                            "y_g": round(ay_g, 3),
-                            "z_g": round(az_g, 3),
-                            "total_g": round(tot_g, 3),
-                            "unit": "g (9.81 m/s²)"
-                        },
-                        "source": "GoPro HERO GPMF (goimuex CLI)"
-                    })
-
-    # 2. Extract genuine physical sensor telemetry directly from pure raw GoPro .MP4 in OneDrive
-    if not extracted_series:
-        print("[GoPro IMU] Extracting pure .MP4 physical sensor data from OneDrive (GX010077.MP4)...")
-        extracted_series = fetch_gopro_imu_from_onedrive_mp4(total_frames=total_frames, fps=fps)
-
-    # 3. Autonomous Hydrodynamic Wave-Coupled Motion Fallback (Last Resort Only)
-    if not extracted_series:
-        base_hs = 2.56
-        wa_file = os.path.join(sequence_dir, "wave_analysis_000.json")
-        if os.path.exists(wa_file):
-            try:
-                with open(wa_file, "r") as wf:
-                    wdata = json.load(wf)
-                    base_hs = float(wdata.get("significant_wave_height_Hs_m", 2.56))
-            except Exception:
-                pass
-        extracted_series = generate_wave_coupled_imu_series(total_frames=total_frames, fps=fps, base_hs=base_hs)
-
-    payload = {
-        "device": "GoPro HERO Binocular IMU (InvenSense ICM-20689 6-DOF DMP)",
-        "sample_rate_hz": 200,
-        "video_fps": fps,
-        "total_frames": len(extracted_series),
-        "source": extracted_series[0].get("source", "GoPro HERO GPMF"),
-        "frames": extracted_series
-    }
-
-    try:
-        with open(telemetry_file, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-        # Also generate unified sequence CSV and per-frame CSV files
-        export_all_frames_imu_csv(sequence_dir, imu_payload=payload)
-    except Exception as e:
-        print(f"[GoPro IMU] Could not cache {telemetry_file}: {e}")
-
-    return payload
 
 
 def extract_frame_imu_scalars(frame_dict):
     """
     Safely extracts 3-axis gyro (deg/s) and accel (g) scalar floats from a frame dictionary.
+    Supports both single camera and binocular stereo payloads (cam0, cam1, baseline differential).
     """
     if not isinstance(frame_dict, dict):
         frame_dict = {}
 
-    gyro = frame_dict.get("gyroscope", {})
-    if not isinstance(gyro, dict):
-        gyro = {}
-    gx = float(gyro.get("x_dps", gyro.get("rate_roll_dps", 0.0)) or 0.0)
-    gy = float(gyro.get("y_dps", gyro.get("rate_pitch_dps", 0.0)) or 0.0)
-    gz = float(gyro.get("z_dps", gyro.get("rate_yaw_dps", 0.0)) or 0.0)
-    g_mag = math.sqrt(gx**2 + gy**2 + gz**2)
+    has_cam0 = "cam0" in frame_dict and isinstance(frame_dict["cam0"], dict)
+    has_cam1 = "cam1" in frame_dict and isinstance(frame_dict["cam1"], dict)
 
-    accel = frame_dict.get("accelerometer", {})
-    if not isinstance(accel, dict):
-        accel = {}
-    ax = float(accel.get("x_g", accel.get("surge_ax_g", 0.0)) or 0.0)
-    ay = float(accel.get("y_g", accel.get("sway_ay_g", 0.0)) or 0.0)
-    az = float(accel.get("z_g", accel.get("heave_az_g", 1.0)) or 1.0)
-    a_mag = float(accel.get("total_g", math.sqrt(ax**2 + ay**2 + az**2)) or 1.0)
+    c0_dict = frame_dict["cam0"] if has_cam0 else frame_dict
+    c1_dict = frame_dict["cam1"] if has_cam1 else None
+
+    # Base / Cam 0
+    c0_gyro = c0_dict.get("gyroscope", {}) if isinstance(c0_dict, dict) else {}
+    c0_gx = float(c0_gyro.get("x_dps", c0_gyro.get("rate_roll_dps", 0.0)) or 0.0)
+    c0_gy = float(c0_gyro.get("y_dps", c0_gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+    c0_gz = float(c0_gyro.get("z_dps", c0_gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+    c0_g_mag = math.sqrt(c0_gx**2 + c0_gy**2 + c0_gz**2)
+
+    c0_accel = c0_dict.get("accelerometer", {}) if isinstance(c0_dict, dict) else {}
+    c0_ax = float(c0_accel.get("x_g", c0_accel.get("surge_ax_g", 0.0)) or 0.0)
+    c0_ay = float(c0_accel.get("y_g", c0_accel.get("sway_ay_g", 0.0)) or 0.0)
+    c0_az = float(c0_accel.get("z_g", c0_accel.get("heave_az_g", 1.0)) or 1.0)
+    c0_a_mag = float(c0_accel.get("total_g", math.sqrt(c0_ax**2 + c0_ay**2 + c0_az**2)) or 1.0)
+
+    # Top-level fallback or primary
+    gx = c0_gx
+    gy = c0_gy
+    gz = c0_gz
+    g_mag = c0_g_mag
+    ax = c0_ax
+    ay = c0_ay
+    az = c0_az
+    a_mag = c0_a_mag
+
+    top_gyro = frame_dict.get("gyroscope")
+    if isinstance(top_gyro, dict) and "x_dps" in top_gyro:
+        gx = float(top_gyro.get("x_dps", gx) or gx)
+        gy = float(top_gyro.get("y_dps", gy) or gy)
+        gz = float(top_gyro.get("z_dps", gz) or gz)
+        g_mag = math.sqrt(gx**2 + gy**2 + gz**2)
+
+    top_accel = frame_dict.get("accelerometer")
+    if isinstance(top_accel, dict) and "x_g" in top_accel:
+        ax = float(top_accel.get("x_g", ax) or ax)
+        ay = float(top_accel.get("y_g", ay) or ay)
+        az = float(top_accel.get("z_g", az) or az)
+        a_mag = float(top_accel.get("total_g", math.sqrt(ax**2 + ay**2 + az**2)) or a_mag)
 
     t_sec = float(frame_dict.get("timestamp_sec", 0.0) or 0.0)
     idx = int(frame_dict.get("frame_index", 0) or 0)
 
-    return {
+    res = {
         "frame_index": idx,
         "timestamp_sec": round(t_sec, 4),
         "gyro_x_dps": round(gx, 2),
@@ -941,13 +1087,68 @@ def extract_frame_imu_scalars(frame_dict):
         "accel_y_g": round(ay, 3),
         "accel_z_g": round(az, 3),
         "accel_mag_g": round(a_mag, 3),
+        "is_stereo": False
     }
+
+    if has_cam0 and has_cam1 and isinstance(c1_dict, dict):
+        c1_gyro = c1_dict.get("gyroscope", {}) if isinstance(c1_dict, dict) else {}
+        c1_gx = float(c1_gyro.get("x_dps", c1_gyro.get("rate_roll_dps", 0.0)) or 0.0)
+        c1_gy = float(c1_gyro.get("y_dps", c1_gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+        c1_gz = float(c1_gyro.get("z_dps", c1_gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+        c1_g_mag = math.sqrt(c1_gx**2 + c1_gy**2 + c1_gz**2)
+
+        c1_accel = c1_dict.get("accelerometer", {}) if isinstance(c1_dict, dict) else {}
+        c1_ax = float(c1_accel.get("x_g", c1_accel.get("surge_ax_g", 0.0)) or 0.0)
+        c1_ay = float(c1_accel.get("y_g", c1_accel.get("sway_ay_g", 0.0)) or 0.0)
+        c1_az = float(c1_accel.get("z_g", c1_accel.get("heave_az_g", 1.0)) or 1.0)
+        c1_a_mag = float(c1_accel.get("total_g", math.sqrt(c1_ax**2 + c1_ay**2 + c1_az**2)) or 1.0)
+
+        # Baseline differential
+        dgx = c1_gx - c0_gx
+        dgy = c1_gy - c0_gy
+        dgz = c1_gz - c0_gz
+        dg_mag = math.sqrt(dgx**2 + dgy**2 + dgz**2)
+
+        dax = c1_ax - c0_ax
+        day = c1_ay - c0_ay
+        daz = c1_az - c0_az
+        da_mag = math.sqrt(dax**2 + day**2 + daz**2)
+
+        res.update({
+            "is_stereo": True,
+            "cam0_gyro_x_dps": round(c0_gx, 2),
+            "cam0_gyro_y_dps": round(c0_gy, 2),
+            "cam0_gyro_z_dps": round(c0_gz, 2),
+            "cam0_gyro_mag_dps": round(c0_g_mag, 2),
+            "cam0_accel_x_g": round(c0_ax, 3),
+            "cam0_accel_y_g": round(c0_ay, 3),
+            "cam0_accel_z_g": round(c0_az, 3),
+            "cam0_accel_mag_g": round(c0_a_mag, 3),
+            "cam1_gyro_x_dps": round(c1_gx, 2),
+            "cam1_gyro_y_dps": round(c1_gy, 2),
+            "cam1_gyro_z_dps": round(c1_gz, 2),
+            "cam1_gyro_mag_dps": round(c1_g_mag, 2),
+            "cam1_accel_x_g": round(c1_ax, 3),
+            "cam1_accel_y_g": round(c1_ay, 3),
+            "cam1_accel_z_g": round(c1_az, 3),
+            "cam1_accel_mag_g": round(c1_a_mag, 3),
+            "delta_gyro_x_dps": round(dgx, 2),
+            "delta_gyro_y_dps": round(dgy, 2),
+            "delta_gyro_z_dps": round(dgz, 2),
+            "delta_gyro_mag_dps": round(dg_mag, 2),
+            "delta_accel_x_g": round(dax, 3),
+            "delta_accel_y_g": round(day, 3),
+            "delta_accel_z_g": round(daz, 3),
+            "delta_accel_mag_g": round(da_mag, 3),
+        })
+
+    return res
 
 
 def export_frame_imu_csv(sequence_dir, frame_idx, imu_entry=None, out_csv_path=None):
     """
     Exports a single frame's 3-axis IMU telemetry (Gyroscope and Accelerometer) to CSV.
-    Columns: frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g
+    Supports both single-camera and dual-camera stereo formats.
     """
     if imu_entry is None:
         seq_imu = get_or_extract_sequence_imu(sequence_dir)
@@ -962,8 +1163,20 @@ def export_frame_imu_csv(sequence_dir, frame_idx, imu_entry=None, out_csv_path=N
     s = extract_frame_imu_scalars(imu_entry)
     s["frame_index"] = frame_idx
 
-    header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g\n"
-    row = f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f}\n"
+    if s.get("is_stereo"):
+        header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g,delta_gyro_mag_dps,delta_accel_mag_g\n"
+        row = (
+            f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},"
+            f"{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f},"
+            f"{s['cam0_gyro_x_dps']:.2f},{s['cam0_gyro_y_dps']:.2f},{s['cam0_gyro_z_dps']:.2f},"
+            f"{s['cam0_accel_x_g']:.3f},{s['cam0_accel_y_g']:.3f},{s['cam0_accel_z_g']:.3f},"
+            f"{s['cam1_gyro_x_dps']:.2f},{s['cam1_gyro_y_dps']:.2f},{s['cam1_gyro_z_dps']:.2f},"
+            f"{s['cam1_accel_x_g']:.3f},{s['cam1_accel_y_g']:.3f},{s['cam1_accel_z_g']:.3f},"
+            f"{s['delta_gyro_mag_dps']:.2f},{s['delta_accel_mag_g']:.3f}\n"
+        )
+    else:
+        header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g\n"
+        row = f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f}\n"
 
     if out_csv_path is None:
         out_csv_path = os.path.join(sequence_dir, f"gopro_imu_{frame_idx:03d}.csv")
@@ -981,6 +1194,7 @@ def export_all_frames_imu_csv(sequence_dir, imu_payload=None, out_csv_path=None)
     """
     Exports all frames' 3-axis IMU telemetry to a unified sequence CSV file,
     and also ensures individual per-frame gopro_imu_{idx:03d}.csv are generated.
+    Supports both single-camera and binocular stereo payloads.
     """
     if imu_payload is None:
         imu_payload = get_or_extract_sequence_imu(sequence_dir)
@@ -995,11 +1209,31 @@ def export_all_frames_imu_csv(sequence_dir, imu_payload=None, out_csv_path=None)
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
 
-    header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g\n"
+    # Check if first frame is stereo
+    first_s = extract_frame_imu_scalars(frames[0])
+    is_stereo = first_s.get("is_stereo", False)
+
+    if is_stereo:
+        header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g,delta_gyro_mag_dps,delta_accel_mag_g\n"
+    else:
+        header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g\n"
+
     lines = [header]
     for f in frames:
         s = extract_frame_imu_scalars(f)
-        line = f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f}\n"
+        if is_stereo:
+            line = (
+                f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},"
+                f"{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f},"
+                f"{s['cam0_gyro_x_dps']:.2f},{s['cam0_gyro_y_dps']:.2f},{s['cam0_gyro_z_dps']:.2f},"
+                f"{s['cam0_accel_x_g']:.3f},{s['cam0_accel_y_g']:.3f},{s['cam0_accel_z_g']:.3f},"
+                f"{s['cam1_gyro_x_dps']:.2f},{s['cam1_gyro_y_dps']:.2f},{s['cam1_gyro_z_dps']:.2f},"
+                f"{s['cam1_accel_x_g']:.3f},{s['cam1_accel_y_g']:.3f},{s['cam1_accel_z_g']:.3f},"
+                f"{s['delta_gyro_mag_dps']:.2f},{s['delta_accel_mag_g']:.3f}\n"
+            )
+        else:
+            line = f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f}\n"
+
         lines.append(line)
         # Also ensure per-frame CSV exists
         per_frame_path = os.path.join(sequence_dir, f"gopro_imu_{s['frame_index']:03d}.csv")

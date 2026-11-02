@@ -395,8 +395,31 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path, imu
         ay = float(imu_telemetry.get("accel_y_g", accel.get("y_g", accel.get("sway_ay_g", 0.0))) or 0.0)
         az = float(imu_telemetry.get("accel_z_g", accel.get("z_g", accel.get("heave_az_g", 1.0))) or 1.0)
 
-        header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
-        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+        has_stereo = isinstance(imu_telemetry, dict) and "cam0" in imu_telemetry and "cam1" in imu_telemetry
+        if has_stereo:
+            c0_gyro = imu_telemetry["cam0"].get("gyroscope", {}) if isinstance(imu_telemetry["cam0"], dict) else {}
+            c0_accel = imu_telemetry["cam0"].get("accelerometer", {}) if isinstance(imu_telemetry["cam0"], dict) else {}
+            c0_gx = float(c0_gyro.get("x_dps", c0_gyro.get("rate_roll_dps", 0.0)) or 0.0)
+            c0_gy = float(c0_gyro.get("y_dps", c0_gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+            c0_gz = float(c0_gyro.get("z_dps", c0_gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+            c0_ax = float(c0_accel.get("x_g", c0_accel.get("surge_ax_g", 0.0)) or 0.0)
+            c0_ay = float(c0_accel.get("y_g", c0_accel.get("sway_ay_g", 0.0)) or 0.0)
+            c0_az = float(c0_accel.get("z_g", c0_accel.get("heave_az_g", 1.0)) or 1.0)
+
+            c1_gyro = imu_telemetry["cam1"].get("gyroscope", {}) if isinstance(imu_telemetry["cam1"], dict) else {}
+            c1_accel = imu_telemetry["cam1"].get("accelerometer", {}) if isinstance(imu_telemetry["cam1"], dict) else {}
+            c1_gx = float(c1_gyro.get("x_dps", c1_gyro.get("rate_roll_dps", 0.0)) or 0.0)
+            c1_gy = float(c1_gyro.get("y_dps", c1_gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+            c1_gz = float(c1_gyro.get("z_dps", c1_gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+            c1_ax = float(c1_accel.get("x_g", c1_accel.get("surge_ax_g", 0.0)) or 0.0)
+            c1_ay = float(c1_accel.get("y_g", c1_accel.get("sway_ay_g", 0.0)) or 0.0)
+            c1_az = float(c1_accel.get("z_g", c1_accel.get("heave_az_g", 1.0)) or 1.0)
+
+            header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g\n"
+            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f},{c0_gx:.2f},{c0_gy:.2f},{c0_gz:.2f},{c0_ax:.3f},{c0_ay:.3f},{c0_az:.3f},{c1_gx:.2f},{c1_gy:.2f},{c1_gz:.2f},{c1_ax:.3f},{c1_ay:.3f},{c1_az:.3f}\n"
+        else:
+            header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
     else:
         header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m\n"
         imu_suffix = "\n"
@@ -443,8 +466,31 @@ def export_circular_arcs_circumference_csv(
         ay = float(imu_telemetry.get("accel_y_g", accel.get("y_g", accel.get("sway_ay_g", 0.0))) or 0.0)
         az = float(imu_telemetry.get("accel_z_g", accel.get("z_g", accel.get("heave_az_g", 1.0))) or 1.0)
 
-        header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
-        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+        has_stereo = isinstance(imu_telemetry, dict) and "cam0" in imu_telemetry and "cam1" in imu_telemetry
+        if has_stereo:
+            c0_gyro = imu_telemetry["cam0"].get("gyroscope", {}) if isinstance(imu_telemetry["cam0"], dict) else {}
+            c0_accel = imu_telemetry["cam0"].get("accelerometer", {}) if isinstance(imu_telemetry["cam0"], dict) else {}
+            c0_gx = float(c0_gyro.get("x_dps", c0_gyro.get("rate_roll_dps", 0.0)) or 0.0)
+            c0_gy = float(c0_gyro.get("y_dps", c0_gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+            c0_gz = float(c0_gyro.get("z_dps", c0_gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+            c0_ax = float(c0_accel.get("x_g", c0_accel.get("surge_ax_g", 0.0)) or 0.0)
+            c0_ay = float(c0_accel.get("y_g", c0_accel.get("sway_ay_g", 0.0)) or 0.0)
+            c0_az = float(c0_accel.get("z_g", c0_accel.get("heave_az_g", 1.0)) or 1.0)
+
+            c1_gyro = imu_telemetry["cam1"].get("gyroscope", {}) if isinstance(imu_telemetry["cam1"], dict) else {}
+            c1_accel = imu_telemetry["cam1"].get("accelerometer", {}) if isinstance(imu_telemetry["cam1"], dict) else {}
+            c1_gx = float(c1_gyro.get("x_dps", c1_gyro.get("rate_roll_dps", 0.0)) or 0.0)
+            c1_gy = float(c1_gyro.get("y_dps", c1_gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+            c1_gz = float(c1_gyro.get("z_dps", c1_gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+            c1_ax = float(c1_accel.get("x_g", c1_accel.get("surge_ax_g", 0.0)) or 0.0)
+            c1_ay = float(c1_accel.get("y_g", c1_accel.get("sway_ay_g", 0.0)) or 0.0)
+            c1_az = float(c1_accel.get("z_g", c1_accel.get("heave_az_g", 1.0)) or 1.0)
+
+            header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g\n"
+            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f},{c0_gx:.2f},{c0_gy:.2f},{c0_gz:.2f},{c0_ax:.3f},{c0_ay:.3f},{c0_az:.3f},{c1_gx:.2f},{c1_gy:.2f},{c1_gz:.2f},{c1_ax:.3f},{c1_ay:.3f},{c1_az:.3f}\n"
+        else:
+            header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
     else:
         header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m\n"
         imu_suffix = "\n"
