@@ -513,6 +513,27 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, recon
                 cap1.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
                 log(f"[Stream Seek] Video streams advanced to start frame offset {start_frame}.")
 
+            if enable_audio_sync:
+                try:
+                    from wass_webapp.gopro_imu import get_audio_sync_offset
+                    seq_dir_temp = os.path.join(WORK_DIR, "sequence")
+                    sync_info = get_audio_sync_offset(seq_dir_temp, pair_id=pair_name, cam0_path=custom_cam0, cam1_path=custom_cam1)
+                    lag_sec = float(sync_info.get("offset_seconds", 0.0))
+                    fps_val = cap0.get(cv2.CAP_PROP_FPS) or 10.0
+                    lag_frames = int(round(lag_sec * fps_val))
+                    leading = sync_info.get("leading_camera", "cam1" if lag_sec > 0 else "cam0")
+                    if abs(lag_frames) > 0:
+                        if leading == "cam1" or (leading != "cam0" and lag_frames > 0):
+                            log(f"[Audio/Timestamp Sync] Advancing Cam 1 by {abs(lag_frames)} frames ({lag_sec:.2f}s) to align with Cam 0 shutter.")
+                            for _ in range(abs(lag_frames)):
+                                cap1.grab()
+                        else:
+                            log(f"[Audio/Timestamp Sync] Advancing Cam 0 by {abs(lag_frames)} frames ({lag_sec:.2f}s) to align with Cam 1 shutter.")
+                            for _ in range(abs(lag_frames)):
+                                cap0.grab()
+                except Exception as se:
+                    log(f"[Audio Sync Note] Stream sync check: {se}")
+
         seq_dir = os.path.join(WORK_DIR, "sequence")
         os.makedirs(seq_dir, exist_ok=True)
 
@@ -1423,13 +1444,15 @@ def export_all_arcs_zip():
                             from wass_webapp.gopro_imu import get_frame_imu_scalars
                             s = get_frame_imu_scalars(seq_dir, i)
                             if s and "gyro_x_dps" in s:
-                                header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\r\n"
+                                ts_val = float(s.get("timestamp_sec", s.get("nominal_timestamp_sec", round(i / 10.0, 4))) or 0.0)
+                                header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\r\n"
                                 gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
                                 ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
-                                imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\r\n"
+                                imu_suffix = f",{ts_val:.4f},{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\r\n"
                             else:
-                                header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
-                                imu_suffix = "\r\n"
+                                ts_val = round(float(i) / 10.0, 4)
+                                header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,timestamp_sec\r\n"
+                                imu_suffix = f",{ts_val:.4f}\r\n"
                             rows = [header]
                             for a in arcs:
                                 if not isinstance(a, dict):
@@ -1637,13 +1660,15 @@ def export_circular_arcs_csv(target: str):
             s = {}
 
     if s and "gyro_x_dps" in s:
-        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\r\n"
+        ts_val = float(s.get("timestamp_sec", s.get("nominal_timestamp_sec", round(idx / 10.0, 4) if idx is not None else 0.0)) or 0.0)
+        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\r\n"
         gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
         ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
-        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\r\n"
+        imu_suffix = f",{ts_val:.4f},{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\r\n"
     else:
-        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
-        imu_suffix = "\r\n"
+        ts_val = round(float(idx if idx is not None else 0) / 10.0, 4)
+        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,timestamp_sec\r\n"
+        imu_suffix = f",{ts_val:.4f}\r\n"
 
     csv_rows = [header]
     for a in arcs:

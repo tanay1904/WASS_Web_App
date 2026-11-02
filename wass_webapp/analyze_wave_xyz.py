@@ -388,6 +388,7 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path, imu
     if imu_telemetry:
         gyro = imu_telemetry.get("gyroscope", {}) if isinstance(imu_telemetry, dict) else {}
         accel = imu_telemetry.get("accelerometer", {}) if isinstance(imu_telemetry, dict) else {}
+        ts_val = float(imu_telemetry.get("timestamp_sec", imu_telemetry.get("nominal_timestamp_sec", 0.0)) or 0.0)
         gx = float(imu_telemetry.get("gyro_x_dps", gyro.get("x_dps", gyro.get("rate_roll_dps", 0.0))) or 0.0)
         gy = float(imu_telemetry.get("gyro_y_dps", gyro.get("y_dps", gyro.get("rate_pitch_dps", 0.0))) or 0.0)
         gz = float(imu_telemetry.get("gyro_z_dps", gyro.get("z_dps", gyro.get("rate_yaw_dps", 0.0))) or 0.0)
@@ -395,8 +396,8 @@ def export_annotated_xyz(pts, dist_observer, height_sea_level, out_csv_path, imu
         ay = float(imu_telemetry.get("accel_y_g", accel.get("y_g", accel.get("sway_ay_g", 0.0))) or 0.0)
         az = float(imu_telemetry.get("accel_z_g", accel.get("z_g", accel.get("heave_az_g", 1.0))) or 1.0)
 
-        header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
-        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+        header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        imu_suffix = f",{ts_val:.4f},{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
     else:
         header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m\n"
         imu_suffix = "\n"
@@ -422,7 +423,7 @@ def export_circular_arcs_circumference_csv(
     """
     Exports exact wave height for all points along the circumference of the circular arcs
     centered at the research vessel mast origin (0, 0, 0).
-    Columns: frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m
+    Columns: frame_index,timestamp_sec,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m
     If imu_telemetry is provided, appends 3-axis gyro and 3-axis accel telemetry:
     gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g
     """
@@ -436,6 +437,7 @@ def export_circular_arcs_circumference_csv(
     if imu_telemetry:
         gyro = imu_telemetry.get("gyroscope", {}) if isinstance(imu_telemetry, dict) else {}
         accel = imu_telemetry.get("accelerometer", {}) if isinstance(imu_telemetry, dict) else {}
+        ts_val = float(imu_telemetry.get("timestamp_sec", imu_telemetry.get("nominal_timestamp_sec", round(frame_idx / 10.0, 4))) or 0.0)
         gx = float(imu_telemetry.get("gyro_x_dps", gyro.get("x_dps", gyro.get("rate_roll_dps", 0.0))) or 0.0)
         gy = float(imu_telemetry.get("gyro_y_dps", gyro.get("y_dps", gyro.get("rate_pitch_dps", 0.0))) or 0.0)
         gz = float(imu_telemetry.get("gyro_z_dps", gyro.get("z_dps", gyro.get("rate_yaw_dps", 0.0))) or 0.0)
@@ -443,10 +445,11 @@ def export_circular_arcs_circumference_csv(
         ay = float(imu_telemetry.get("accel_y_g", accel.get("y_g", accel.get("sway_ay_g", 0.0))) or 0.0)
         az = float(imu_telemetry.get("accel_z_g", accel.get("z_g", accel.get("heave_az_g", 1.0))) or 1.0)
 
-        header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        header = "frame_index,timestamp_sec,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
         imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
     else:
-        header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m\n"
+        ts_val = round(float(frame_idx) / 10.0, 4)
+        header = "frame_index,timestamp_sec,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m\n"
         imu_suffix = "\n"
 
     pts_arr = np.atleast_2d(pts) if (hasattr(pts, 'size') and pts.size > 0) else np.empty((0, 3))
@@ -479,7 +482,7 @@ def export_circular_arcs_circumference_csv(
     lines = [header]
     for idx_pt, (f_i, r_val, az_val, px_val, py_val, d_val) in enumerate(meta):
         h_val = round(float(interp_h[idx_pt]), 4)
-        lines.append(f"{f_i},{r_val:.1f},{az_val:.2f},{px_val:.4f},{py_val:.4f},{h_val:.4f},{d_val:.1f}{imu_suffix}")
+        lines.append(f"{f_i},{ts_val:.4f},{r_val:.1f},{az_val:.2f},{px_val:.4f},{py_val:.4f},{h_val:.4f},{d_val:.1f}{imu_suffix}")
 
     csv_data = "".join(lines)
     with open(out_csv_path, "w", encoding="utf-8") as f:

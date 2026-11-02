@@ -250,24 +250,38 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
             cap1.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
             print(f"[Video Feeder] Fast-forwarded dual cameras to start frame {start_frame}")
 
-        # Sub-millisecond audio cross-correlation auto-sync
+        # Sub-millisecond audio & physical shutter cross-correlation auto-sync
         if enable_audio_sync:
+            sync_info = None
             try:
                 from wass_webapp.audio_sync import compute_audio_offset
                 sync_info = compute_audio_offset(video0_path, video1_path)
-                lag_sec = sync_info.get("offset_seconds", 0.0)
-                lag_frames = int(round(lag_sec * fps))
-                print(f"[Audio Sync] Sub-millisecond offset: {sync_info.get('offset_ms', 0.0):.2f} ms ({lag_frames} frames lag).")
-                if lag_frames > 0:
-                    print(f"[Audio Sync] Cam 0 is ahead by {lag_frames} frames. Advancing Cam 0 to synchronize...")
-                    for _ in range(lag_frames):
-                        cap0.grab()
-                elif lag_frames < 0:
-                    print(f"[Audio Sync] Cam 1 is ahead by {abs(lag_frames)} frames. Advancing Cam 1 to synchronize...")
-                    for _ in range(abs(lag_frames)):
-                        cap1.grab()
             except Exception as se:
-                print(f"[Audio Sync Note] Auto-sync check skipped: {se}")
+                print(f"[Audio Sync Note] Live audio cross-correlation check: {se}")
+
+            if not sync_info or sync_info.get("status") == "no_audio" or abs(float(sync_info.get("offset_seconds", 0.0))) < 1e-4:
+                try:
+                    from wass_webapp.gopro_imu import get_audio_sync_offset
+                    sync_info = get_audio_sync_offset(os.path.join(work_dir, "sequence"), cam0_path=video0_path, cam1_path=video1_path)
+                except Exception as ge:
+                    print(f"[Audio Sync Note] IMU/calibrated offset note: {ge}")
+
+            if sync_info:
+                lag_sec = float(sync_info.get("offset_seconds", 0.0))
+                lag_frames = int(round(lag_sec * fps))
+                leading = sync_info.get("leading_camera", "cam1" if lag_sec > 0 else "cam0")
+                print(f"[Audio/Timestamp Sync] Offset: {sync_info.get('offset_ms', lag_sec * 1000.0):.2f} ms ({lag_frames} frames lag). Leading camera: {leading}")
+                if abs(lag_frames) > 0:
+                    if leading == "cam1" or (leading != "cam0" and lag_frames > 0):
+                        adv_frames = abs(lag_frames)
+                        print(f"[Audio/Timestamp Sync] Cam 1 was triggered earlier by {adv_frames} frames ({lag_sec:.2f}s). Advancing Cam 1 to synchronize...")
+                        for _ in range(adv_frames):
+                            cap1.grab()
+                    else:
+                        adv_frames = abs(lag_frames)
+                        print(f"[Audio/Timestamp Sync] Cam 0 was triggered earlier by {adv_frames} frames ({lag_sec:.2f}s). Advancing Cam 0 to synchronize...")
+                        for _ in range(adv_frames):
+                            cap0.grab()
         else:
             print("[Audio Sync] Hydroacoustic audio sync is GUARDED OFF by user configuration.")
 

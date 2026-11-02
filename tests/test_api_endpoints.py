@@ -83,6 +83,7 @@ def test_export_arcs_csv():
         lines = response.text.strip().split("\n")
     expected_header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg"
     assert lines[0].startswith(expected_header)
+    assert "timestamp_sec" in lines[0]
     assert "gyro_x_dps" in lines[0]
     assert "accel_x_g" in lines[0]
     assert len(lines) == 11 # 1 header + 10 arc rows
@@ -94,8 +95,10 @@ def test_export_circumference_csv():
     assert response.status_code == 200
     assert "text/csv" in response.headers.get("content-type", "")
     lines = response.text.strip().split("\n")
-    expected_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m"
+    expected_header = "frame_index,timestamp_sec,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m"
     assert lines[0].strip().startswith(expected_header)
+    assert "timestamp_sec" in lines[0]
+    assert "gyro_x_dps" in lines[0]
     # 10 radii * 161 azimuth angles = 1610 data points + 1 header line = 1611 lines
     assert len(lines) == 1611
 

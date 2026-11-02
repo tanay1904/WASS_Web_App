@@ -189,7 +189,7 @@ def test_export_annotated_xyz_with_imu(tmp_path):
     content = out_csv.read_text(encoding="utf-8")
     lines = content.strip().split("\n")
     assert len(lines) == 2
-    assert lines[0] == "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g"
+    assert lines[0] == "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g"
     assert "2.50,-1.20,0.30,0.040,-0.020,1.050" in lines[1]
 
 

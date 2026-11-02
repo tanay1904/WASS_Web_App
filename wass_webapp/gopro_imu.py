@@ -1182,13 +1182,15 @@ def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_fr
     # Update per-frame annotated_points_*.csv and circular_arcs_points_*.csv
     for idx, f_entry in enumerate(frames):
         s = extract_frame_imu_scalars(f_entry)
+        t_sec = float(s.get("timestamp_sec", round(idx / 10.0, 4)) or 0.0)
         gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
         ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
 
         imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
-        ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
-        arc_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
-        arc_sum_header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        ann_suffix = f",{t_sec:.4f},{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+        ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        arc_header = "frame_index,timestamp_sec,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        arc_sum_header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
 
         ann_path = os.path.join(sequence_dir, f"annotated_points_{idx:03d}.csv")
         if os.path.exists(ann_path):
@@ -1199,7 +1201,7 @@ def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_fr
                     new_lines = [ann_header]
                     for line in lines[1:]:
                         parts = line.strip().split(",")[:5]
-                        new_lines.append(",".join(parts) + imu_suffix)
+                        new_lines.append(",".join(parts) + ann_suffix)
                     with open(ann_path, "w", encoding="utf-8") as af:
                         af.writelines(new_lines)
             except Exception:
@@ -1212,9 +1214,14 @@ def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_fr
                     lines = arcf.readlines()
                 if lines:
                     new_lines = [arc_header]
+                    has_ts = "timestamp_sec" in lines[0]
                     for line in lines[1:]:
-                        parts = line.strip().split(",")[:7]
-                        new_lines.append(",".join(parts) + imu_suffix)
+                        raw_parts = line.strip().split(",")
+                        if has_ts:
+                            core_parts = [raw_parts[0], f"{t_sec:.4f}"] + raw_parts[2:8]
+                        else:
+                            core_parts = [raw_parts[0], f"{t_sec:.4f}"] + raw_parts[1:7]
+                        new_lines.append(",".join(core_parts) + imu_suffix)
                     with open(arc_path, "w", encoding="utf-8") as arcf:
                         arcf.writelines(new_lines)
             except Exception:
@@ -1229,7 +1236,7 @@ def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_fr
                     new_lines = [arc_sum_header]
                     for line in lines[1:]:
                         parts = line.strip().split(",")[:12]
-                        new_lines.append(",".join(parts) + imu_suffix)
+                        new_lines.append(",".join(parts) + f",{t_sec:.4f}" + imu_suffix)
                     with open(arc_sum_path, "w", encoding="utf-8") as asf:
                         asf.writelines(new_lines)
             except Exception:
