@@ -1116,6 +1116,16 @@ def get_or_extract_sequence_imu(
     """
     v_src = (video_source or "").lower().strip()
 
+    # Dynamically detect sequence FPS from sequence_meta.json if available
+    if sequence_dir and os.path.exists(os.path.join(sequence_dir, "sequence_meta.json")):
+        try:
+            with open(os.path.join(sequence_dir, "sequence_meta.json"), "r") as mf:
+                mdata = json.load(mf)
+                if "fps" in mdata and (fps is None or fps == 10.0):
+                    fps = float(mdata["fps"])
+        except Exception:
+            pass
+
     # Stereo rig routing
     if not v_src or v_src in ["stereo", "binocular", "both", "dual", "pair1_stereo", "pair1", "default"]:
         return get_or_extract_binocular_stereo_imu(

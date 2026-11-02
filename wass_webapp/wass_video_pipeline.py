@@ -208,7 +208,7 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
             print(f"[Video Feeder] Fast-forwarded to start frame {start_frame}")
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         print(f"[Video Feeder] Total frames: {total_frames}, FPS: {fps:.1f}")
 
         while True:
@@ -243,7 +243,7 @@ def extract_frames_from_videos(video0_path, video1_path, video_sbs_path, work_di
         if not cap0.isOpened() or not cap1.isOpened():
             raise RuntimeError("Failed to open one or both video streams")
 
-        fps = cap0.get(cv2.CAP_PROP_FPS) or 25.0
+        fps = cap0.get(cv2.CAP_PROP_FPS) or 30.0
 
         if start_frame > 0:
             cap0.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
@@ -420,7 +420,7 @@ def run_wass_pipeline(work_dir, binaries, num_frames):
     return True
 
 
-def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=False):
+def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=False, fps=30.0):
     """
     Translates raw native WASS C++ outputs (plane_refinement_inliers.xyz, plane.txt, disparity_final_scaled.png)
     into Web Studio sequence artifacts (points_XXX.json, points_XXX.xyz, wave_analysis_XXX.json, sequence_meta.json).
@@ -435,10 +435,11 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buff
     import json
     rendered_count = 0
 
+    effective_fps = float(fps) if fps and fps > 0 else 30.0
     seq_imu_payload = None
     try:
         from wass_webapp.gopro_imu import get_or_extract_sequence_imu
-        seq_imu_payload = get_or_extract_sequence_imu(seq_dir, total_frames=len(workspaces), fps=10.0)
+        seq_imu_payload = get_or_extract_sequence_imu(seq_dir, total_frames=len(workspaces), fps=effective_fps)
     except Exception:
         pass
 
@@ -567,7 +568,7 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buff
 
     meta = {
         "total_frames": rendered_count,
-        "fps": 10,
+        "fps": round(effective_fps, 2) if isinstance(effective_fps, (int, float)) else 30,
         "grid_w": 100,
         "grid_h": 70,
         "engine": "WASS Native C++ Pipeline (wass_prepare -> wass_match -> wass_autocalibrate -> wass_stereo)"

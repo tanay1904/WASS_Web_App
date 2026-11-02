@@ -916,13 +916,29 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames=100000, step=1, us
         # 5. Format native WASS C++ outputs into studio sequence artifacts
         log("[Format] Translating native WASS C++ point clouds and disparity maps to sequence artifacts...")
         seq_dir = os.path.join(work_dir, "sequence")
+
+        # Determine effective sequence framerate from video and step (defaults to native 30 FPS)
+        src_fps = 30.0
+        try:
+            v_probe_path = video0 or video_sbs
+            if v_probe_path and os.path.exists(v_probe_path):
+                c_probe = cv2.VideoCapture(v_probe_path)
+                if c_probe.isOpened():
+                    p_fps = c_probe.get(cv2.CAP_PROP_FPS)
+                    if p_fps and p_fps > 0:
+                        src_fps = float(p_fps)
+                c_probe.release()
+        except Exception:
+            pass
+        effective_fps = src_fps / max(1.0, float(step))
+
         from wass_webapp.wass_video_pipeline import format_wass_workspaces_to_sequence
-        rendered_count = format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=enable_circular_buffer)
-        log(f"  -> Successfully formatted {rendered_count} native WASS frames into 3D point clouds and telemetry.")
+        rendered_count = format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=enable_circular_buffer, fps=effective_fps)
+        log(f"  -> Successfully formatted {rendered_count} native WASS frames at {effective_fps:.2f} FPS into 3D point clouds and telemetry.")
 
         try:
             from wass_webapp.gopro_imu import get_or_extract_sequence_imu
-            get_or_extract_sequence_imu(seq_dir, total_frames=rendered_count, fps=10.0, video_path=video0 or video_sbs or None)
+            get_or_extract_sequence_imu(seq_dir, total_frames=rendered_count, fps=effective_fps, video_path=video0 or video_sbs or None)
         except Exception as ie:
             log(f"[GoPro IMU Note] Telemetry sync: {ie}")
 
