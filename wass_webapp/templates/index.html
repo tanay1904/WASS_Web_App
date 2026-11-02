@@ -590,72 +590,83 @@
                 </div>
               </div>
 
-              <!-- GoPro IMU Telemetry & Motion Dashboard (vguzov/gopro_imu_extractor) -->
+              <!-- GoPro Raw IMU Telemetry (vguzov/gopro_imu_extractor) -->
               <div class="flex-shrink-0 p-2 rounded" style="background-color: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);" id="goproImuCard">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span class="stat-label mb-0">
-                    <i class="fa-solid fa-compass text-info me-1"></i> GoPro IMU & Vessel Dynamics
+                    <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU: Gyro & Acceleration
                   </span>
                   <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;">
-                    <i class="fa-solid fa-circle-check me-1"></i> 200 Hz DMP
+                    <i class="fa-solid fa-circle-check me-1"></i> 200 Hz GPMF
                   </span>
                 </div>
 
-                <!-- Attitude Indicator & Metric Strip -->
-                <div class="row g-1 align-items-center my-1">
-                  <!-- Artificial Horizon Mini Gauge -->
-                  <div class="col-4 text-center">
-                    <div class="position-relative mx-auto rounded-circle border overflow-hidden" style="width: 58px; height: 58px; background: #0b1320; border-color: rgba(56, 189, 248, 0.4) !important;">
-                      <!-- Sky / Ground Level -->
-                      <div id="imuHorizonSky" style="position: absolute; width: 140%; height: 70%; top: -10%; left: -20%; background: #1e3a8a; transition: transform 0.05s ease-out;"></div>
-                      <div id="imuHorizonGround" style="position: absolute; width: 140%; height: 70%; bottom: -10%; left: -20%; background: #78350f; transition: transform 0.05s ease-out;"></div>
-                      <!-- Horizon Line & Reticle -->
-                      <div id="imuHorizonLine" style="position: absolute; width: 140%; height: 2px; background: #38bdf8; top: calc(50% - 1px); left: -20%; transition: transform 0.05s ease-out; box-shadow: 0 0 4px #38bdf8; z-index: 1;"></div>
-                      <div style="position: absolute; width: 8px; height: 8px; border: 2px solid #facc15; border-radius: 50%; top: calc(50% - 4px); left: calc(50% - 4px); z-index: 2;"></div>
-                    </div>
-                    <div class="stat-desc mt-1" style="font-size: 0.62rem;">Attitude Gauge</div>
+                <!-- 3-Axis Gyroscope Section (deg/s) -->
+                <div class="mb-1 p-1 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
+                  <div class="d-flex justify-content-between align-items-center px-1 mb-1">
+                    <span class="text-warning fw-semibold" style="font-size: 0.65rem;"><i class="fa-solid fa-rotate me-1"></i> 3-Axis Gyroscope (Angular Rate)</span>
+                    <span class="font-monospace text-secondary" style="font-size: 0.62rem;" id="imuGyroTotal">|ω|: 0.00°/s</span>
                   </div>
-
-                  <!-- Pitch & Roll Tiles -->
-                  <div class="col-4">
-                    <div class="p-1 rounded text-center border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
-                      <div class="text-muted" style="font-size: 0.62rem;">Pitch (θ)</div>
-                      <div class="fw-bold font-monospace text-warning" id="imuPitchVal" style="font-size: 0.85rem;">+0.0°</div>
-                      <div class="text-secondary" style="font-size: 0.58rem;" id="imuPitchRate">0.0°/s</div>
+                  <div class="row g-1 text-center font-monospace" style="font-size: 0.7rem;">
+                    <div class="col-4">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(245, 158, 11, 0.3) !important;">
+                        <span class="text-muted" style="font-size: 0.58rem;">ωx (Roll):</span><br>
+                        <span class="text-warning fw-bold" id="imuGyroX">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                      </div>
                     </div>
-                  </div>
-                  <div class="col-4">
-                    <div class="p-1 rounded text-center border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
-                      <div class="text-muted" style="font-size: 0.62rem;">Roll (φ)</div>
-                      <div class="fw-bold font-monospace text-info" id="imuRollVal" style="font-size: 0.85rem;">+0.0°</div>
-                      <div class="text-secondary" style="font-size: 0.58rem;" id="imuRollRate">0.0°/s</div>
+                    <div class="col-4">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(245, 158, 11, 0.3) !important;">
+                        <span class="text-muted" style="font-size: 0.58rem;">ωy (Pitch):</span><br>
+                        <span class="text-warning fw-bold" id="imuGyroY">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(245, 158, 11, 0.3) !important;">
+                        <span class="text-muted" style="font-size: 0.58rem;">ωz (Yaw):</span><br>
+                        <span class="text-warning fw-bold" id="imuGyroZ">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Accelerometer & Heave Strip -->
-                <div class="row g-1 text-center font-monospace mt-1" style="font-size: 0.68rem;">
-                  <div class="col-4 p-1 rounded border" style="background: rgba(14, 19, 29, 0.4); border-color: var(--border-subtle) !important;">
-                    <span class="text-muted" style="font-size: 0.6rem;">Heave (Az):</span><br>
-                    <span class="text-success fw-bold" id="imuHeaveVal">1.00 g</span>
+                <!-- 3-Axis Accelerometer Section (g / m/s²) -->
+                <div class="mb-1 p-1 rounded border" style="background: rgba(14, 19, 29, 0.6); border-color: var(--border-subtle) !important;">
+                  <div class="d-flex justify-content-between align-items-center px-1 mb-1">
+                    <span class="text-info fw-semibold" style="font-size: 0.65rem;"><i class="fa-solid fa-gauge-high me-1"></i> 3-Axis Accelerometer (Linear G-Force)</span>
+                    <span class="font-monospace text-success fw-bold" style="font-size: 0.62rem;" id="imuAccelTotal">|a|: 1.000 g</span>
                   </div>
-                  <div class="col-4 p-1 rounded border" style="background: rgba(14, 19, 29, 0.4); border-color: var(--border-subtle) !important;">
-                    <span class="text-muted" style="font-size: 0.6rem;">Surge (Ax):</span><br>
-                    <span class="text-light fw-bold" id="imuSurgeVal">0.00 g</span>
-                  </div>
-                  <div class="col-4 p-1 rounded border" style="background: rgba(14, 19, 29, 0.4); border-color: var(--border-subtle) !important;">
-                    <span class="text-muted" style="font-size: 0.6rem;">Sway (Ay):</span><br>
-                    <span class="text-light fw-bold" id="imuSwayVal">0.00 g</span>
+                  <div class="row g-1 text-center font-monospace" style="font-size: 0.7rem;">
+                    <div class="col-4">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
+                        <span class="text-muted" style="font-size: 0.58rem;">Ax (Surge):</span><br>
+                        <span class="text-info fw-bold" id="imuAccelX">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
+                        <span class="text-muted" style="font-size: 0.58rem;">Ay (Sway):</span><br>
+                        <span class="text-info fw-bold" id="imuAccelY">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
+                        <span class="text-muted" style="font-size: 0.58rem;">Az (Heave):</span><br>
+                        <span class="text-success fw-bold" id="imuAccelZ">+1.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Live Attitude Waveform Track Canvas -->
-                <div class="mt-1">
+                <!-- Raw Sensor Multi-Trace Waveform -->
+                <div>
                   <div class="d-flex justify-content-between align-items-center mb-0" style="font-size: 0.6rem;">
-                    <span class="text-muted"><i class="fa-solid fa-wave-square me-1"></i> Motion Waveform (Pitch & Roll)</span>
-                    <span class="font-monospace text-secondary" id="imuTotalGLbl">Total: 1.00g</span>
+                    <span class="text-muted">
+                      <span class="text-warning me-2"><i class="fa-solid fa-minus me-1"></i>Gyro (deg/s)</span>
+                      <span class="text-info"><i class="fa-solid fa-minus me-1"></i>Accel (g)</span>
+                    </span>
+                    <span class="font-monospace text-muted" id="imuSampleIdxLbl">Frame 0</span>
                   </div>
-                  <canvas id="imuMotionCanvas" width="310" height="38" style="width: 100%; height: 38px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
+                  <canvas id="imuMotionCanvas" width="310" height="42" style="width: 100%; height: 42px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
                 </div>
               </div>
 
@@ -2919,43 +2930,40 @@
       const f = imuSequenceData[idx] || imuSequenceData[Math.min(idx, imuSequenceData.length - 1)];
       if (!f) return;
 
-      const pitch = (f.attitude && typeof f.attitude.pitch_deg === 'number') ? f.attitude.pitch_deg : 0.0;
-      const roll = (f.attitude && typeof f.attitude.roll_deg === 'number') ? f.attitude.roll_deg : 0.0;
-      const rateP = (f.gyroscope && typeof f.gyroscope.rate_pitch_dps === 'number') ? f.gyroscope.rate_pitch_dps : 0.0;
-      const rateR = (f.gyroscope && typeof f.gyroscope.rate_roll_dps === 'number') ? f.gyroscope.rate_roll_dps : 0.0;
-      const az = (f.accelerometer && typeof f.accelerometer.heave_az_g === 'number') ? f.accelerometer.heave_az_g : 1.0;
-      const ax = (f.accelerometer && typeof f.accelerometer.surge_ax_g === 'number') ? f.accelerometer.surge_ax_g : 0.0;
-      const ay = (f.accelerometer && typeof f.accelerometer.sway_ay_g === 'number') ? f.accelerometer.sway_ay_g : 0.0;
-      const totG = (f.accelerometer && typeof f.accelerometer.total_g === 'number') ? f.accelerometer.total_g : Math.sqrt(ax*ax + ay*ay + az*az);
+      // 1. Raw 3-Axis Gyroscope (deg/s)
+      const gx = (f.gyroscope && typeof f.gyroscope.x_dps === 'number') ? f.gyroscope.x_dps : ((f.gyroscope && f.gyroscope.rate_roll_dps) || 0.0);
+      const gy = (f.gyroscope && typeof f.gyroscope.y_dps === 'number') ? f.gyroscope.y_dps : ((f.gyroscope && f.gyroscope.rate_pitch_dps) || 0.0);
+      const gz = (f.gyroscope && typeof f.gyroscope.z_dps === 'number') ? f.gyroscope.z_dps : ((f.gyroscope && f.gyroscope.rate_yaw_dps) || 0.0);
+      const totOmega = Math.sqrt(gx*gx + gy*gy + gz*gz);
 
-      const pitchEl = document.getElementById('imuPitchVal');
-      if (pitchEl) pitchEl.innerText = `${pitch >= 0 ? '+' : ''}${pitch.toFixed(1)}°`;
-      const rollEl = document.getElementById('imuRollVal');
-      if (rollEl) rollEl.innerText = `${roll >= 0 ? '+' : ''}${roll.toFixed(1)}°`;
-      const pitchRateEl = document.getElementById('imuPitchRate');
-      if (pitchRateEl) pitchRateEl.innerText = `dθ: ${rateP.toFixed(1)}°/s`;
-      const rollRateEl = document.getElementById('imuRollRate');
-      if (rollRateEl) rollRateEl.innerText = `dφ: ${rateR.toFixed(1)}°/s`;
+      // 2. Raw 3-Axis Accelerometer (g)
+      const ax = (f.accelerometer && typeof f.accelerometer.x_g === 'number') ? f.accelerometer.x_g : ((f.accelerometer && f.accelerometer.surge_ax_g) || 0.0);
+      const ay = (f.accelerometer && typeof f.accelerometer.y_g === 'number') ? f.accelerometer.y_g : ((f.accelerometer && f.accelerometer.sway_ay_g) || 0.0);
+      const az = (f.accelerometer && typeof f.accelerometer.z_g === 'number') ? f.accelerometer.z_g : ((f.accelerometer && f.accelerometer.heave_az_g) || 1.0);
+      const totA = (f.accelerometer && typeof f.accelerometer.total_g === 'number') ? f.accelerometer.total_g : Math.sqrt(ax*ax + ay*ay + az*az);
 
-      const heaveEl = document.getElementById('imuHeaveVal');
-      if (heaveEl) heaveEl.innerText = `${az.toFixed(2)} g`;
-      const surgeEl = document.getElementById('imuSurgeVal');
-      if (surgeEl) surgeEl.innerText = `${ax.toFixed(2)} g`;
-      const swayEl = document.getElementById('imuSwayVal');
-      if (swayEl) swayEl.innerText = `${ay.toFixed(2)} g`;
-      const totalGLbl = document.getElementById('imuTotalGLbl');
-      if (totalGLbl) totalGLbl.innerText = `Total: ${totG.toFixed(2)}g`;
+      // DOM Gyroscope Updates
+      const gxEl = document.getElementById('imuGyroX');
+      if (gxEl) gxEl.innerText = `${gx >= 0 ? '+' : ''}${gx.toFixed(2)}`;
+      const gyEl = document.getElementById('imuGyroY');
+      if (gyEl) gyEl.innerText = `${gy >= 0 ? '+' : ''}${gy.toFixed(2)}`;
+      const gzEl = document.getElementById('imuGyroZ');
+      if (gzEl) gzEl.innerText = `${gz >= 0 ? '+' : ''}${gz.toFixed(2)}`;
+      const gTotEl = document.getElementById('imuGyroTotal');
+      if (gTotEl) gTotEl.innerText = `|ω|: ${totOmega.toFixed(2)}°/s`;
 
-      const skyEl = document.getElementById('imuHorizonSky');
-      const groundEl = document.getElementById('imuHorizonGround');
-      const lineEl = document.getElementById('imuHorizonLine');
-      const clampPitch = Math.max(-15, Math.min(15, pitch));
-      const transY = clampPitch * 1.4;
-      const rotDeg = -roll;
+      // DOM Accelerometer Updates
+      const axEl = document.getElementById('imuAccelX');
+      if (axEl) axEl.innerText = `${ax >= 0 ? '+' : ''}${ax.toFixed(3)}`;
+      const ayEl = document.getElementById('imuAccelY');
+      if (ayEl) ayEl.innerText = `${ay >= 0 ? '+' : ''}${ay.toFixed(3)}`;
+      const azEl = document.getElementById('imuAccelZ');
+      if (azEl) azEl.innerText = `${az >= 0 ? '+' : ''}${az.toFixed(3)}`;
+      const aTotEl = document.getElementById('imuAccelTotal');
+      if (aTotEl) aTotEl.innerText = `|a|: ${totA.toFixed(3)} g`;
 
-      if (lineEl) lineEl.style.transform = `translate(0px, ${transY}px) rotate(${rotDeg}deg)`;
-      if (skyEl) skyEl.style.transform = `translate(0px, ${transY}px) rotate(${rotDeg}deg)`;
-      if (groundEl) groundEl.style.transform = `translate(0px, ${transY}px) rotate(${rotDeg}deg)`;
+      const idxLbl = document.getElementById('imuSampleIdxLbl');
+      if (idxLbl) idxLbl.innerText = `Frame ${idx}`;
 
       drawImuMotionCanvas(idx);
     }
@@ -2970,6 +2978,7 @@
       const h = cvs.height;
       ctx.clearRect(0, 0, w, h);
 
+      // Baseline center line
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -2980,26 +2989,26 @@
       const total = imuSequenceData.length;
       if (total <= 1) return;
 
-      // Draw Roll (Cyan)
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let i = 0; i < total; i++) {
-        const x = (i / (total - 1)) * w;
-        const rVal = (imuSequenceData[i].attitude?.roll_deg || 0.0);
-        const y = (h / 2) - (rVal / 8.0) * (h / 2 * 0.85);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-
-      // Draw Pitch (Amber/Yellow)
+      // Draw Raw Gyroscope Rate (Amber, scaled to +/- 15 deg/s)
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < total; i++) {
         const x = (i / (total - 1)) * w;
-        const pVal = (imuSequenceData[i].attitude?.pitch_deg || 0.0);
-        const y = (h / 2) - (pVal / 8.0) * (h / 2 * 0.85);
+        const gVal = (imuSequenceData[i].gyroscope?.rate_roll_dps || imuSequenceData[i].gyroscope?.x_dps || 0.0);
+        const y = (h / 2) - (gVal / 12.0) * (h / 2 * 0.85);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Draw Raw Acceleration (Cyan, scaled to heave perturbation +/- 0.5g)
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < total; i++) {
+        const x = (i / (total - 1)) * w;
+        const aVal = (imuSequenceData[i].accelerometer?.heave_az_g || imuSequenceData[i].accelerometer?.z_g || 1.0) - 1.0;
+        const y = (h / 2) - (aVal / 0.4) * (h / 2 * 0.85);
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
@@ -3013,10 +3022,10 @@
       ctx.lineTo(curX, h);
       ctx.stroke();
 
-      // Indicator Dot
-      const curRoll = (imuSequenceData[curIdx]?.attitude?.roll_deg || 0.0);
-      const curY = (h / 2) - (curRoll / 8.0) * (h / 2 * 0.85);
-      ctx.fillStyle = '#38bdf8';
+      // Cursor indicator dot on active sample
+      const curG = (imuSequenceData[curIdx]?.gyroscope?.rate_roll_dps || imuSequenceData[curIdx]?.gyroscope?.x_dps || 0.0);
+      const curY = (h / 2) - (curG / 12.0) * (h / 2 * 0.85);
+      ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
       ctx.arc(curX, curY, 3, 0, Math.PI * 2);
       ctx.fill();
