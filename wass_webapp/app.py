@@ -664,7 +664,22 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, recon
             analysis, pts_arr, dist_obs, h_sea = analyze_xyz(xyz_path)
             with open(os.path.join(seq_dir, f"wave_analysis_{i:03d}.json"), "w") as fa:
                 json.dump(analysis, fa, indent=2)
-            export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"))
+
+            frame_imu = None
+            try:
+                from wass_webapp.gopro_imu import export_frame_imu_csv
+                export_frame_imu_csv(seq_dir, i)
+                seq_imu_file = os.path.join(seq_dir, "gopro_imu_telemetry.json")
+                if os.path.exists(seq_imu_file):
+                    with open(seq_imu_file, "r") as sif:
+                        sdata = json.load(sif)
+                    frames = sdata.get("frames", [])
+                    if 0 <= i < len(frames):
+                        frame_imu = frames[i]
+            except Exception:
+                pass
+
+            export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"), imu_telemetry=frame_imu)
             export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
 
             rendered_count += 1
@@ -1391,6 +1406,28 @@ def export_all_arcs_zip():
                 except Exception:
                     pass
 
+            # 4. GoPro IMU Telemetry CSV (3-axis Gyroscope & Accelerometer for each frame)
+            imu_csv = os.path.join(seq_dir, f"gopro_imu_{i:03d}.csv")
+            if not os.path.exists(imu_csv):
+                try:
+                    from wass_webapp.gopro_imu import export_frame_imu_csv
+                    export_frame_imu_csv(seq_dir, i)
+                except Exception:
+                    pass
+            if os.path.exists(imu_csv):
+                zip_file.write(imu_csv, arcname=f"gopro_imu_frame_{i:03d}.csv")
+
+        # 5. Full Sequence GoPro IMU Telemetry CSV
+        all_imu_csv = os.path.join(seq_dir, "gopro_imu_telemetry.csv")
+        if not os.path.exists(all_imu_csv):
+            try:
+                from wass_webapp.gopro_imu import export_all_frames_imu_csv
+                export_all_frames_imu_csv(seq_dir)
+            except Exception:
+                pass
+        if os.path.exists(all_imu_csv):
+            zip_file.write(all_imu_csv, arcname="gopro_imu_telemetry_all_frames.csv")
+
     zip_buffer.seek(0)
     return Response(
         content=zip_buffer.getvalue(),
@@ -1672,6 +1709,111 @@ def get_imu_telemetry():
         return JSONResponse(telemetry)
     except Exception as e:
         return JSONResponse({"error": f"Failed to retrieve IMU telemetry: {str(e)}"}, status_code=500)
+
+
+@app.get("/api/telemetry/imu/export_all_csv")
+def export_all_imu_csv_download():
+    """
+    Direct download attachment for the entire sequence's 3-axis IMU telemetry CSV.
+    """
+    seq_dir = os.path.join(WORK_DIR, "sequence")
+    from wass_webapp.gopro_imu import export_all_frames_imu_csv
+    csv_file = os.path.join(seq_dir, "gopro_imu_telemetry.csv")
+    if not os.path.exists(csv_file):
+        export_all_frames_imu_csv(seq_dir)
+    if os.path.exists(csv_file):
+        return FileResponse(path=csv_file, filename="gopro_imu_telemetry_all_frames.csv", media_type="text/csv")
+    return JSONResponse({"error": "IMU telemetry CSV not found"}, status_code=404)
+
+
+@app.get("/api/telemetry/imu/export_csv/{target:path}")
+def export_imu_csv_download(target: str):
+    """
+    Direct file download attachment for GoPro IMU telemetry CSV.
+    """
+    if not is_safe_identifier(target):
+        return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+
+    seq_dir = os.path.join(WORK_DIR, "sequence")
+    from wass_webapp.gopro_imu import export_frame_imu_csv, export_all_frames_imu_csv
+
+    if target in ["all", "sequence", "telemetry"]:
+        csv_file = os.path.join(seq_dir, "gopro_imu_telemetry.csv")
+        if not os.path.exists(csv_file):
+            export_all_frames_imu_csv(seq_dir)
+        if os.path.exists(csv_file):
+            return FileResponse(path=csv_file, filename="gopro_imu_telemetry_all_frames.csv", media_type="text/csv")
+        return JSONResponse({"error": "IMU telemetry CSV not found"}, status_code=404)
+
+    idx = None
+    if target.startswith("frame_"):
+        val = target.replace("frame_", "")
+        if val.isdigit():
+            idx = int(val)
+    elif target.startswith("sequence_"):
+        val = target.replace("sequence_", "")
+        if val.isdigit():
+            idx = int(val)
+    elif target.isdigit():
+        idx = int(target)
+
+    if idx is None or idx < 0:
+        return JSONResponse({"error": f"Invalid frame index: {target}"}, status_code=400)
+
+    csv_file = os.path.join(seq_dir, f"gopro_imu_{idx:03d}.csv")
+    if not os.path.exists(csv_file):
+        export_frame_imu_csv(seq_dir, idx)
+    if os.path.exists(csv_file):
+        return FileResponse(path=csv_file, filename=f"gopro_imu_frame_{idx:03d}.csv", media_type="text/csv")
+    return JSONResponse({"error": f"IMU CSV for frame {idx} not found"}, status_code=404)
+
+
+@app.get("/api/telemetry/imu/csv/{target:path}")
+def get_imu_csv(target: str):
+    """
+    Returns CSV text for GoPro IMU telemetry:
+    - If target is a frame number or frame_{idx}, returns single-frame 3-axis IMU CSV.
+    - If target is 'all' or 'sequence', returns unified multi-frame sequence CSV.
+    """
+    if not is_safe_identifier(target):
+        return JSONResponse({"error": "Invalid target identifier"}, status_code=400)
+
+    seq_dir = os.path.join(WORK_DIR, "sequence")
+    from wass_webapp.gopro_imu import export_frame_imu_csv, export_all_frames_imu_csv
+
+    if target in ["all", "sequence", "telemetry"]:
+        csv_file = os.path.join(seq_dir, "gopro_imu_telemetry.csv")
+        if not os.path.exists(csv_file):
+            export_all_frames_imu_csv(seq_dir)
+        if os.path.exists(csv_file):
+            with open(csv_file, "r", encoding="utf-8") as f:
+                content = f.read()
+            return Response(content=content, media_type="text/csv", headers={"Content-Disposition": 'inline; filename="gopro_imu_telemetry.csv"'})
+        return JSONResponse({"error": "IMU telemetry CSV not found"}, status_code=404)
+
+    idx = None
+    if target.startswith("frame_"):
+        val = target.replace("frame_", "")
+        if val.isdigit():
+            idx = int(val)
+    elif target.startswith("sequence_"):
+        val = target.replace("sequence_", "")
+        if val.isdigit():
+            idx = int(val)
+    elif target.isdigit():
+        idx = int(target)
+
+    if idx is None or idx < 0:
+        return JSONResponse({"error": f"Invalid frame index: {target}"}, status_code=400)
+
+    csv_file = os.path.join(seq_dir, f"gopro_imu_{idx:03d}.csv")
+    if not os.path.exists(csv_file):
+        export_frame_imu_csv(seq_dir, idx)
+    if os.path.exists(csv_file):
+        with open(csv_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        return Response(content=content, media_type="text/csv", headers={"Content-Disposition": f'inline; filename="gopro_imu_frame_{idx:03d}.csv"'})
+    return JSONResponse({"error": f"IMU CSV for frame {idx} not found"}, status_code=404)
 
 
 @app.get("/api/telemetry/imu/{frame_idx}")

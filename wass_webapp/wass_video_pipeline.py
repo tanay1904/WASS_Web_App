@@ -485,7 +485,22 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buff
             )
             with open(os.path.join(seq_dir, f"wave_analysis_{i:03d}.json"), "w") as fa:
                 json.dump(analysis, fa, indent=2)
-            export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"))
+
+            frame_imu = None
+            try:
+                from wass_webapp.gopro_imu import export_frame_imu_csv
+                export_frame_imu_csv(seq_dir, i)
+                seq_imu_file = os.path.join(seq_dir, "gopro_imu_telemetry.json")
+                if os.path.exists(seq_imu_file):
+                    with open(seq_imu_file, "r") as sif:
+                        sdata = json.load(sif)
+                    frames = sdata.get("frames", [])
+                    if 0 <= i < len(frames):
+                        frame_imu = frames[i]
+            except Exception:
+                pass
+
+            export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"), imu_telemetry=frame_imu)
             export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
             rendered_count += 1
 

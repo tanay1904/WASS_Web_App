@@ -609,21 +609,21 @@
                   </div>
                   <div class="row g-1 text-center font-monospace" style="font-size: 0.7rem;">
                     <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(245, 158, 11, 0.3) !important;">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.3) !important;">
                         <span class="text-muted" style="font-size: 0.58rem;">ωx (Roll):</span><br>
-                        <span class="text-warning fw-bold" id="imuGyroX">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                        <span class="fw-bold" style="color: #f43f5e;" id="imuGyroX">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
                       </div>
                     </div>
                     <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(245, 158, 11, 0.3) !important;">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.3) !important;">
                         <span class="text-muted" style="font-size: 0.58rem;">ωy (Pitch):</span><br>
-                        <span class="text-warning fw-bold" id="imuGyroY">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                        <span class="fw-bold" style="color: #10b981;" id="imuGyroY">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
                       </div>
                     </div>
                     <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(245, 158, 11, 0.3) !important;">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
                         <span class="text-muted" style="font-size: 0.58rem;">ωz (Yaw):</span><br>
-                        <span class="text-warning fw-bold" id="imuGyroZ">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
+                        <span class="fw-bold" style="color: #38bdf8;" id="imuGyroZ">+0.00</span><span class="text-muted" style="font-size: 0.55rem;">°/s</span>
                       </div>
                     </div>
                   </div>
@@ -637,36 +637,75 @@
                   </div>
                   <div class="row g-1 text-center font-monospace" style="font-size: 0.7rem;">
                     <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.3) !important;">
                         <span class="text-muted" style="font-size: 0.58rem;">Ax (Surge):</span><br>
-                        <span class="text-info fw-bold" id="imuAccelX">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
+                        <span class="fw-bold" style="color: #f43f5e;" id="imuAccelX">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
                       </div>
                     </div>
                     <div class="col-4">
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
+                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.3) !important;">
                         <span class="text-muted" style="font-size: 0.58rem;">Ay (Sway):</span><br>
-                        <span class="text-info fw-bold" id="imuAccelY">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
+                        <span class="fw-bold" style="color: #10b981;" id="imuAccelY">+0.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
                       </div>
                     </div>
                     <div class="col-4">
                       <div class="p-1 rounded bg-dark border" style="border-color: rgba(56, 189, 248, 0.3) !important;">
                         <span class="text-muted" style="font-size: 0.58rem;">Az (Heave):</span><br>
-                        <span class="text-success fw-bold" id="imuAccelZ">+1.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
+                        <span class="fw-bold" style="color: #38bdf8;" id="imuAccelZ">+1.000</span><span class="text-muted" style="font-size: 0.55rem;"> g</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Raw Sensor Multi-Trace Waveform -->
-                <div>
-                  <div class="d-flex justify-content-between align-items-center mb-0" style="font-size: 0.6rem;">
-                    <span class="text-muted">
-                      <span class="text-warning me-2"><i class="fa-solid fa-minus me-1"></i>Gyro (deg/s)</span>
-                      <span class="text-info"><i class="fa-solid fa-minus me-1"></i>Accel (g)</span>
-                    </span>
-                    <span class="font-monospace text-muted" id="imuSampleIdxLbl">Frame 0</span>
+                <!-- 3-Axis Multi-Trace Waveforms -->
+                <div class="mt-1">
+                  <!-- Mode Selector Toolbar -->
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="font-monospace text-muted" style="font-size: 0.6rem;" id="imuSampleIdxLbl">Frame 0</span>
+                    <div class="btn-group btn-group-sm" style="font-size: 0.6rem;">
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1 active" id="btnImuModeDual" onclick="setImuGraphMode('dual')" style="font-size: 0.58rem;">Dual Split</button>
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeGyro" onclick="setImuGraphMode('gyro')" style="font-size: 0.58rem;">Gyro 3-Axis</button>
+                      <button type="button" class="btn btn-outline-secondary py-0 px-1" id="btnImuModeAccel" onclick="setImuGraphMode('accel')" style="font-size: 0.58rem;">Accel 3-Axis</button>
+                    </div>
                   </div>
-                  <canvas id="imuMotionCanvas" width="310" height="42" style="width: 100%; height: 42px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
+
+                  <!-- Gyroscope 3-Axis Canvas Wrap -->
+                  <div id="imuGyroCanvasWrap" class="mb-1">
+                    <div class="d-flex justify-content-between align-items-center px-1" style="font-size: 0.58rem;">
+                      <span class="text-muted">
+                        <span style="color: #f43f5e;" class="me-1">● ωx</span>
+                        <span style="color: #10b981;" class="me-1">● ωy</span>
+                        <span style="color: #38bdf8;">● ωz</span>
+                        <span class="text-muted ms-1">(deg/s)</span>
+                      </span>
+                      <span class="font-monospace text-muted" style="font-size: 0.55rem;">Scale: ±14°/s</span>
+                    </div>
+                    <canvas id="imuGyroCanvas" width="310" height="38" style="width: 100%; height: 38px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
+                  </div>
+
+                  <!-- Accelerometer 3-Axis Canvas Wrap -->
+                  <div id="imuAccelCanvasWrap" class="mb-1">
+                    <div class="d-flex justify-content-between align-items-center px-1" style="font-size: 0.58rem;">
+                      <span class="text-muted">
+                        <span style="color: #f43f5e;" class="me-1">● Ax</span>
+                        <span style="color: #10b981;" class="me-1">● Ay</span>
+                        <span style="color: #38bdf8;">● Az-1g</span>
+                        <span class="text-muted ms-1">(g)</span>
+                      </span>
+                      <span class="font-monospace text-muted" style="font-size: 0.55rem;">Scale: ±0.35g</span>
+                    </div>
+                    <canvas id="imuAccelCanvas" width="310" height="38" style="width: 100%; height: 38px; background: rgba(8, 12, 19, 0.85); border-radius: 4px; border: 1px solid var(--border-subtle); display: block;"></canvas>
+                  </div>
+
+                  <!-- Export Action Buttons -->
+                  <div class="d-flex justify-content-between gap-1 mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+                    <button type="button" class="btn btn-outline-info py-0 px-2 flex-grow-1" style="font-size: 0.62rem;" onclick="exportCurrentFrameImuCsv()" title="Export 3-axis IMU CSV for current loaded frame">
+                      <i class="fa-solid fa-file-csv me-1"></i> Frame IMU CSV
+                    </button>
+                    <button type="button" class="btn btn-outline-custom py-0 px-2 flex-grow-1" style="font-size: 0.62rem;" onclick="exportAllImuCsv()" title="Export synchronized 3-axis IMU CSV for entire sequence">
+                      <i class="fa-solid fa-file-zipper me-1"></i> Sequence IMU CSV
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2877,8 +2916,37 @@
     // ==============================================================================
     let imuSequenceData = null;
     let imuTelemetryLoaded = false;
+    let imuGraphMode = 'dual'; // 'dual', 'gyro', 'accel'
+    let isFetchingImu = false;
+
+    function setImuGraphMode(mode) {
+      imuGraphMode = mode;
+      const gyroWrap = document.getElementById('imuGyroCanvasWrap');
+      const accelWrap = document.getElementById('imuAccelCanvasWrap');
+      const btnDual = document.getElementById('btnImuModeDual');
+      const btnGyro = document.getElementById('btnImuModeGyro');
+      const btnAccel = document.getElementById('btnImuModeAccel');
+
+      if (btnDual) btnDual.classList.toggle('active', mode === 'dual');
+      if (btnGyro) btnGyro.classList.toggle('active', mode === 'gyro');
+      if (btnAccel) btnAccel.classList.toggle('active', mode === 'accel');
+
+      if (mode === 'dual') {
+        if (gyroWrap) gyroWrap.classList.remove('d-none');
+        if (accelWrap) accelWrap.classList.remove('d-none');
+      } else if (mode === 'gyro') {
+        if (gyroWrap) gyroWrap.classList.remove('d-none');
+        if (accelWrap) accelWrap.classList.add('d-none');
+      } else if (mode === 'accel') {
+        if (gyroWrap) gyroWrap.classList.add('d-none');
+        if (accelWrap) accelWrap.classList.remove('d-none');
+      }
+      drawImuMotionCanvas(currentFrame);
+    }
 
     async function loadImuTelemetry() {
+      if (isFetchingImu) return;
+      isFetchingImu = true;
       try {
         const res = await fetch('/api/telemetry/imu?t=' + Date.now());
         if (res.ok) {
@@ -2891,42 +2959,89 @@
               const isGpmf = data.source && (data.source.includes('goimuex') || data.source.includes('GPMF'));
               badge.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> ${isGpmf ? 'GPMF goimuex' : '200 Hz DMP'}`;
             }
+            // Ensure sequence accommodates any additional frames being processed
+            const requiredCount = Math.max(typeof totalFrames === 'number' ? totalFrames : 0, currentFrame + 1, imuSequenceData.length);
+            if (requiredCount > imuSequenceData.length) {
+              extendImuSequenceUpTo(requiredCount);
+            }
             updateImuDashboard(currentFrame);
             return;
           }
         }
       } catch (e) {
         console.warn('[IMU] Telemetry fetch note:', e);
+      } finally {
+        isFetchingImu = false;
       }
-      generateFallbackImuTelemetry(totalFrames || 150);
+      generateFallbackImuTelemetry(Math.max(totalFrames || 150, currentFrame + 1));
       updateImuDashboard(currentFrame);
     }
 
-    function generateFallbackImuTelemetry(count) {
-      const frames = [];
+    function extendImuSequenceUpTo(targetCount) {
+      if (!imuSequenceData) imuSequenceData = [];
+      const currentLen = imuSequenceData.length;
+      if (currentLen >= targetCount) return;
+
       const omega = 2.0 * Math.PI / 6.2;
-      for (let i = 0; i < count; i++) {
+      for (let i = currentLen; i < targetCount; i++) {
         const t = i / 30.0;
-        const roll = 3.8 * Math.sin(omega * t) + 1.2 * Math.sin(1.85 * omega * t);
-        const pitch = 2.4 * Math.cos(omega * t + 0.8) + 0.8 * Math.cos(1.85 * omega * t);
-        const d_roll = 3.8 * omega * Math.cos(omega * t);
-        const d_pitch = -2.4 * omega * Math.sin(omega * t + 0.8);
-        const az = 1.0 + 0.18 * Math.sin(omega * t);
-        const ax = 0.04 * Math.sin(omega * t + 0.8);
-        const ay = 0.06 * Math.sin(omega * t);
-        frames.push({
+        const phase1 = omega * t;
+        const phase2 = 1.85 * omega * t + 0.45;
+        const phase3 = 0.65 * omega * t - 0.30;
+
+        const roll = 3.8 * Math.sin(phase1) + 1.2 * Math.sin(phase2);
+        const pitch = 2.4 * Math.cos(phase1 + 0.8) + 0.8 * Math.cos(phase2);
+        const yaw = 1.5 * Math.sin(phase3);
+
+        const d_roll = 3.8 * omega * Math.cos(phase1) + 1.2 * (1.85 * omega) * Math.cos(phase2);
+        const d_pitch = -2.4 * omega * Math.sin(phase1 + 0.8) - 0.8 * (1.85 * omega) * Math.sin(phase2);
+        const d_yaw = 1.5 * (0.65 * omega) * Math.cos(phase3);
+
+        const wave_eta = 1.28 * Math.sin(phase1);
+        const heave_accel_ms2 = -(omega ** 2) * wave_eta;
+        const az = 1.0 + (heave_accel_ms2 / 9.80665);
+        const ax = 0.04 * Math.sin(phase1 + 0.8);
+        const ay = 0.06 * Math.sin(phase1);
+        const totA = Math.sqrt(ax * ax + ay * ay + az * az);
+
+        imuSequenceData.push({
           frame_index: i,
-          attitude: { pitch_deg: Math.round(pitch*100)/100, roll_deg: Math.round(roll*100)/100, yaw_deg: 0.0 },
-          gyroscope: { rate_pitch_dps: Math.round(d_pitch*100)/100, rate_roll_dps: Math.round(d_roll*100)/100, rate_yaw_dps: 0.0 },
-          accelerometer: { heave_az_g: Math.round(az*1000)/1000, surge_ax_g: Math.round(ax*1000)/1000, sway_ay_g: Math.round(ay*1000)/1000, total_g: Math.round(Math.sqrt(ax*ax + ay*ay + az*az)*1000)/1000 }
+          timestamp_sec: Math.round(t * 10000) / 10000,
+          attitude: { pitch_deg: Math.round(pitch * 100) / 100, roll_deg: Math.round(roll * 100) / 100, yaw_deg: Math.round(yaw * 100) / 100 },
+          gyroscope: {
+            rate_pitch_dps: Math.round(d_pitch * 100) / 100,
+            rate_roll_dps: Math.round(d_roll * 100) / 100,
+            rate_yaw_dps: Math.round(d_yaw * 100) / 100,
+            x_dps: Math.round(d_roll * 100) / 100,
+            y_dps: Math.round(d_pitch * 100) / 100,
+            z_dps: Math.round(d_yaw * 100) / 100,
+            unit: "deg/s"
+          },
+          accelerometer: {
+            surge_ax_g: Math.round(ax * 1000) / 1000,
+            sway_ay_g: Math.round(ay * 1000) / 1000,
+            heave_az_g: Math.round(az * 1000) / 1000,
+            x_g: Math.round(ax * 1000) / 1000,
+            y_g: Math.round(ay * 1000) / 1000,
+            z_g: Math.round(az * 1000) / 1000,
+            total_g: Math.round(totA * 1000) / 1000,
+            unit: "g (9.81 m/s²)"
+          }
         });
       }
-      imuSequenceData = frames;
+    }
+
+    function generateFallbackImuTelemetry(count) {
+      imuSequenceData = [];
+      extendImuSequenceUpTo(count);
       imuTelemetryLoaded = true;
     }
 
     function updateImuDashboard(idx) {
-      if (!imuSequenceData || !imuSequenceData.length) return;
+      const requiredLen = Math.max(idx + 1, typeof totalFrames === 'number' ? totalFrames : 0);
+      if (!imuSequenceData || imuSequenceData.length < requiredLen) {
+        extendImuSequenceUpTo(requiredLen + 60);
+      }
       const f = imuSequenceData[idx] || imuSequenceData[Math.min(idx, imuSequenceData.length - 1)];
       if (!f) return;
 
@@ -2934,15 +3049,15 @@
       const gx = (f.gyroscope && typeof f.gyroscope.x_dps === 'number') ? f.gyroscope.x_dps : ((f.gyroscope && f.gyroscope.rate_roll_dps) || 0.0);
       const gy = (f.gyroscope && typeof f.gyroscope.y_dps === 'number') ? f.gyroscope.y_dps : ((f.gyroscope && f.gyroscope.rate_pitch_dps) || 0.0);
       const gz = (f.gyroscope && typeof f.gyroscope.z_dps === 'number') ? f.gyroscope.z_dps : ((f.gyroscope && f.gyroscope.rate_yaw_dps) || 0.0);
-      const totOmega = Math.sqrt(gx*gx + gy*gy + gz*gz);
+      const totOmega = Math.sqrt(gx * gx + gy * gy + gz * gz);
 
       // 2. Raw 3-Axis Accelerometer (g)
       const ax = (f.accelerometer && typeof f.accelerometer.x_g === 'number') ? f.accelerometer.x_g : ((f.accelerometer && f.accelerometer.surge_ax_g) || 0.0);
       const ay = (f.accelerometer && typeof f.accelerometer.y_g === 'number') ? f.accelerometer.y_g : ((f.accelerometer && f.accelerometer.sway_ay_g) || 0.0);
       const az = (f.accelerometer && typeof f.accelerometer.z_g === 'number') ? f.accelerometer.z_g : ((f.accelerometer && f.accelerometer.heave_az_g) || 1.0);
-      const totA = (f.accelerometer && typeof f.accelerometer.total_g === 'number') ? f.accelerometer.total_g : Math.sqrt(ax*ax + ay*ay + az*az);
+      const totA = (f.accelerometer && typeof f.accelerometer.total_g === 'number') ? f.accelerometer.total_g : Math.sqrt(ax * ax + ay * ay + az * az);
 
-      // DOM Gyroscope Updates
+      // DOM Gyroscope Updates (X, Y, Z)
       const gxEl = document.getElementById('imuGyroX');
       if (gxEl) gxEl.innerText = `${gx >= 0 ? '+' : ''}${gx.toFixed(2)}`;
       const gyEl = document.getElementById('imuGyroY');
@@ -2952,7 +3067,7 @@
       const gTotEl = document.getElementById('imuGyroTotal');
       if (gTotEl) gTotEl.innerText = `|ω|: ${totOmega.toFixed(2)}°/s`;
 
-      // DOM Accelerometer Updates
+      // DOM Accelerometer Updates (X, Y, Z)
       const axEl = document.getElementById('imuAccelX');
       if (axEl) axEl.innerText = `${ax >= 0 ? '+' : ''}${ax.toFixed(3)}`;
       const ayEl = document.getElementById('imuAccelY');
@@ -2962,100 +3077,192 @@
       const aTotEl = document.getElementById('imuAccelTotal');
       if (aTotEl) aTotEl.innerText = `|a|: ${totA.toFixed(3)} g`;
 
+      // Synchronize frame progress text with actual sequence span
+      const totalSpan = Math.max(
+        typeof totalFrames === 'number' ? totalFrames : 0,
+        imuSequenceData.length,
+        idx + 1,
+        1
+      );
       const idxLbl = document.getElementById('imuSampleIdxLbl');
-      if (idxLbl) idxLbl.innerText = `Loaded: Frame ${idx} / ${imuSequenceData.length - 1}`;
+      if (idxLbl) idxLbl.innerText = `Loaded: Frame ${idx} / ${totalSpan - 1}`;
 
       drawImuMotionCanvas(idx);
     }
 
     function drawImuMotionCanvas(curIdx) {
-      const cvs = document.getElementById('imuMotionCanvas');
-      if (!cvs || !imuSequenceData || !imuSequenceData.length) return;
+      if (!imuSequenceData || !imuSequenceData.length) return;
+
+      // The true total span accommodating all active and streaming frames
+      const totalSpan = Math.max(
+        typeof totalFrames === 'number' ? totalFrames : 0,
+        imuSequenceData.length,
+        curIdx + 1,
+        10
+      );
+
+      // If playing past current imuSequenceData, dynamically synthesize future kinematics
+      if (curIdx >= imuSequenceData.length) {
+        extendImuSequenceUpTo(curIdx + 60);
+      }
+
+      const clampedCur = Math.max(0, Math.min(curIdx, totalSpan - 1));
+
+      // 1. Gyroscope 3-Axis Canvas
+      const gyroCvs = document.getElementById('imuGyroCanvas');
+      if (gyroCvs && (!gyroCvs.parentElement || !gyroCvs.parentElement.classList.contains('d-none'))) {
+        draw3AxisCanvas(gyroCvs, 'gyro', clampedCur, totalSpan);
+      }
+
+      // 2. Accelerometer 3-Axis Canvas
+      const accelCvs = document.getElementById('imuAccelCanvas');
+      if (accelCvs && (!accelCvs.parentElement || !accelCvs.parentElement.classList.contains('d-none'))) {
+        draw3AxisCanvas(accelCvs, 'accel', clampedCur, totalSpan);
+      }
+    }
+
+    function draw3AxisCanvas(cvs, channelType, clampedCur, totalSpan) {
       const ctx = cvs.getContext('2d');
       if (!ctx) return;
-
       const w = cvs.width;
       const h = cvs.height;
       ctx.clearRect(0, 0, w, h);
 
-      const total = imuSequenceData.length;
-      if (total <= 1) return;
+      const midY = h / 2;
 
-      const clampedCur = Math.max(0, Math.min(curIdx, total - 1));
-
-      // 1. Future/unloaded track background (faint dashed baseline)
+      // 1. Future/unreached timeline dashed baseline across full width (shows pending frames)
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 4]);
       ctx.beginPath();
-      ctx.moveTo(0, h / 2);
-      ctx.lineTo(w, h / 2);
+      ctx.moveTo(0, midY);
+      ctx.lineTo(w, midY);
       ctx.stroke();
-      ctx.setLineDash([]); // Reset dash
+      ctx.setLineDash([]);
 
-      // 2. Determine buffer window: in circular buffer mode, past pruned frames roll off
-      const isBufferPruned = (typeof totalFrames === 'number' && totalFrames > 300 && clampedCur >= 300);
-      const startIdx = isBufferPruned ? (clampedCur - 300) : 0;
+      const curX = (clampedCur / (totalSpan - 1)) * w;
 
-      const startX = (startIdx / (total - 1)) * w;
-      const curX = (clampedCur / (total - 1)) * w;
-
-      // Active baseline up to currently loaded frame
+      // 2. Solid active baseline up to currently loaded frame
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(startX, h / 2);
-      ctx.lineTo(curX, h / 2);
+      ctx.moveTo(0, midY);
+      ctx.lineTo(curX, midY);
       ctx.stroke();
 
-      if (clampedCur > startIdx) {
-        // 3. Draw Raw Gyroscope Rate (Amber) ONLY up to currently loaded frame
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        for (let i = startIdx; i <= clampedCur; i++) {
-          const x = (i / (total - 1)) * w;
-          const gVal = (imuSequenceData[i].gyroscope?.rate_roll_dps || imuSequenceData[i].gyroscope?.x_dps || 0.0);
-          const y = (h / 2) - (gVal / 12.0) * (h / 2 * 0.85);
-          if (i === startIdx) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
+      if (clampedCur <= 0) return;
 
-        // 4. Draw Raw Acceleration Heave (Cyan) ONLY up to currently loaded frame
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        for (let i = startIdx; i <= clampedCur; i++) {
-          const x = (i / (total - 1)) * w;
-          const aVal = (imuSequenceData[i].accelerometer?.heave_az_g || imuSequenceData[i].accelerometer?.z_g || 1.0) - 1.0;
-          const y = (h / 2) - (aVal / 0.4) * (h / 2 * 0.85);
-          if (i === startIdx) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      // Physical scale normalization
+      // Gyroscope: ±14 deg/s scale
+      // Accelerometer: ±0.35 g dynamic wave perturbation scale
+      const maxScale = channelType === 'gyro' ? 14.0 : 0.35;
+      const scaleY = (val) => midY - (val / maxScale) * (midY * 0.85);
+
+      const colors = {
+        x: '#f43f5e', // Coral Red (X: Roll / Surge)
+        y: '#10b981', // Emerald Green (Y: Pitch / Sway)
+        z: '#38bdf8'  // Sky Blue (Z: Yaw / Heave)
+      };
+
+      function getSample(i) {
+        const item = imuSequenceData[Math.min(i, imuSequenceData.length - 1)];
+        if (!item) return { x: 0, y: 0, z: 0 };
+        if (channelType === 'gyro') {
+          const g = item.gyroscope || {};
+          return {
+            x: typeof g.x_dps === 'number' ? g.x_dps : (g.rate_roll_dps || 0.0),
+            y: typeof g.y_dps === 'number' ? g.y_dps : (g.rate_pitch_dps || 0.0),
+            z: typeof g.z_dps === 'number' ? g.z_dps : (g.rate_yaw_dps || 0.0)
+          };
+        } else {
+          const a = item.accelerometer || {};
+          const azRaw = typeof a.z_g === 'number' ? a.z_g : (a.heave_az_g || 1.0);
+          return {
+            x: typeof a.x_g === 'number' ? a.x_g : (a.surge_ax_g || 0.0),
+            y: typeof a.y_g === 'number' ? a.y_g : (a.sway_ay_g || 0.0),
+            z: azRaw - 1.0 // Centered dynamic wave heave perturbation around 0g
+          };
         }
-        ctx.stroke();
       }
 
-      // 5. Leading Playhead Cursor at the frontier of loaded video
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
+      // 3. Draw all 3 orthogonal axes strictly from Frame 0 up to clampedCur (Progressive Stream)
+      ['x', 'y', 'z'].forEach(axis => {
+        ctx.strokeStyle = colors[axis];
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let i = 0; i <= clampedCur; i++) {
+          const x = (i / (totalSpan - 1)) * w;
+          const val = getSample(i)[axis];
+          const y = Math.max(2, Math.min(h - 2, scaleY(val)));
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      });
+
+      // 4. Leading playhead vertical cursor at curX
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(curX, 0);
       ctx.lineTo(curX, h);
       ctx.stroke();
 
-      // Leading edge glow cursor dots
-      const curG = (imuSequenceData[clampedCur]?.gyroscope?.rate_roll_dps || imuSequenceData[clampedCur]?.gyroscope?.x_dps || 0.0);
-      const curGyY = (h / 2) - (curG / 12.0) * (h / 2 * 0.85);
-      ctx.fillStyle = '#f59e0b';
-      ctx.beginPath();
-      ctx.arc(curX, curGyY, 3, 0, Math.PI * 2);
-      ctx.fill();
+      // 5. Leading glow cursor dots on all 3 axes at the current frontier
+      const curSample = getSample(clampedCur);
+      ['x', 'y', 'z'].forEach(axis => {
+        const dotY = Math.max(3, Math.min(h - 3, scaleY(curSample[axis])));
+        ctx.fillStyle = colors[axis];
+        ctx.beginPath();
+        ctx.arc(curX, dotY, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
 
-      const curA = (imuSequenceData[clampedCur]?.accelerometer?.heave_az_g || imuSequenceData[clampedCur]?.accelerometer?.z_g || 1.0) - 1.0;
-      const curAyY = (h / 2) - (curA / 0.4) * (h / 2 * 0.85);
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(curX, curAyY, 3, 0, Math.PI * 2);
-      ctx.fill();
+    async function exportCurrentFrameImuCsv() {
+      const target = currentFrame;
+      try {
+        showToast(`Downloading 3-axis IMU CSV for Frame ${target}...`, 'info');
+        const res = await fetch(`/api/telemetry/imu/export_csv/${target}`);
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `gopro_imu_frame_${String(target).padStart(3, '0')}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          showToast(`Frame ${target} IMU CSV downloaded successfully!`, 'success');
+        } else {
+          showToast(`Error: IMU CSV not found for Frame ${target}`, 'warning');
+        }
+      } catch (err) {
+        showToast(`Network error downloading IMU CSV: ${err.message}`, 'danger');
+      }
+    }
+
+    async function exportAllImuCsv() {
+      try {
+        showToast('Preparing complete sequence 3-axis IMU CSV...', 'info');
+        const res = await fetch('/api/telemetry/imu/export_all_csv');
+        if (res.ok) {
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'gopro_imu_telemetry_all_frames.csv';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          showToast('Sequence IMU CSV downloaded successfully!', 'success');
+        } else {
+          showToast('Error: Sequence IMU CSV not available', 'warning');
+        }
+      } catch (err) {
+        showToast(`Network error downloading Sequence IMU CSV: ${err.message}`, 'danger');
+      }
     }
 
     async function loadMeta() {
@@ -3064,7 +3271,11 @@
         if (res.ok) {
           const meta = await res.json();
           if (typeof meta.total_frames === 'number') {
+            const oldTotal = totalFrames;
             totalFrames = Math.max(0, meta.total_frames);
+            if (totalFrames > (imuSequenceData ? imuSequenceData.length : 0)) {
+              loadImuTelemetry();
+            }
             const slider = document.getElementById('timelineSlider');
             if (slider) {
               slider.min = 0;

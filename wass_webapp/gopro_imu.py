@@ -288,7 +288,120 @@ def get_or_extract_sequence_imu(sequence_dir, total_frames=150, fps=30.0, video_
     try:
         with open(telemetry_file, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
+        # Also generate unified sequence CSV and per-frame CSV files
+        export_all_frames_imu_csv(sequence_dir, imu_payload=payload)
     except Exception as e:
         print(f"[GoPro IMU] Could not cache {telemetry_file}: {e}")
 
     return payload
+
+
+def extract_frame_imu_scalars(frame_dict):
+    """
+    Safely extracts 3-axis gyro (deg/s) and accel (g) scalar floats from a frame dictionary.
+    """
+    if not isinstance(frame_dict, dict):
+        frame_dict = {}
+
+    gyro = frame_dict.get("gyroscope", {})
+    if not isinstance(gyro, dict):
+        gyro = {}
+    gx = float(gyro.get("x_dps", gyro.get("rate_roll_dps", 0.0)) or 0.0)
+    gy = float(gyro.get("y_dps", gyro.get("rate_pitch_dps", 0.0)) or 0.0)
+    gz = float(gyro.get("z_dps", gyro.get("rate_yaw_dps", 0.0)) or 0.0)
+    g_mag = math.sqrt(gx**2 + gy**2 + gz**2)
+
+    accel = frame_dict.get("accelerometer", {})
+    if not isinstance(accel, dict):
+        accel = {}
+    ax = float(accel.get("x_g", accel.get("surge_ax_g", 0.0)) or 0.0)
+    ay = float(accel.get("y_g", accel.get("sway_ay_g", 0.0)) or 0.0)
+    az = float(accel.get("z_g", accel.get("heave_az_g", 1.0)) or 1.0)
+    a_mag = float(accel.get("total_g", math.sqrt(ax**2 + ay**2 + az**2)) or 1.0)
+
+    t_sec = float(frame_dict.get("timestamp_sec", 0.0) or 0.0)
+    idx = int(frame_dict.get("frame_index", 0) or 0)
+
+    return {
+        "frame_index": idx,
+        "timestamp_sec": round(t_sec, 4),
+        "gyro_x_dps": round(gx, 2),
+        "gyro_y_dps": round(gy, 2),
+        "gyro_z_dps": round(gz, 2),
+        "gyro_mag_dps": round(g_mag, 2),
+        "accel_x_g": round(ax, 3),
+        "accel_y_g": round(ay, 3),
+        "accel_z_g": round(az, 3),
+        "accel_mag_g": round(a_mag, 3),
+    }
+
+
+def export_frame_imu_csv(sequence_dir, frame_idx, imu_entry=None, out_csv_path=None):
+    """
+    Exports a single frame's 3-axis IMU telemetry (Gyroscope and Accelerometer) to CSV.
+    Columns: frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g
+    """
+    if imu_entry is None:
+        seq_imu = get_or_extract_sequence_imu(sequence_dir)
+        frames = seq_imu.get("frames", [])
+        if 0 <= frame_idx < len(frames):
+            imu_entry = frames[frame_idx]
+        elif frames:
+            imu_entry = frames[min(frame_idx, len(frames) - 1)]
+        else:
+            imu_entry = {"frame_index": frame_idx, "timestamp_sec": float(frame_idx)/30.0}
+
+    s = extract_frame_imu_scalars(imu_entry)
+    s["frame_index"] = frame_idx
+
+    header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g\n"
+    row = f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f}\n"
+
+    if out_csv_path is None:
+        out_csv_path = os.path.join(sequence_dir, f"gopro_imu_{frame_idx:03d}.csv")
+
+    out_dir = os.path.dirname(os.path.abspath(out_csv_path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(out_csv_path, "w", encoding="utf-8") as f:
+        f.write(header)
+        f.write(row)
+    return out_csv_path
+
+
+def export_all_frames_imu_csv(sequence_dir, imu_payload=None, out_csv_path=None):
+    """
+    Exports all frames' 3-axis IMU telemetry to a unified sequence CSV file,
+    and also ensures individual per-frame gopro_imu_{idx:03d}.csv are generated.
+    """
+    if imu_payload is None:
+        imu_payload = get_or_extract_sequence_imu(sequence_dir)
+    frames = imu_payload.get("frames", [])
+    if not frames:
+        return None
+
+    if out_csv_path is None:
+        out_csv_path = os.path.join(sequence_dir, "gopro_imu_telemetry.csv")
+
+    out_dir = os.path.dirname(os.path.abspath(out_csv_path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+
+    header = "frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g\n"
+    lines = [header]
+    for f in frames:
+        s = extract_frame_imu_scalars(f)
+        line = f"{s['frame_index']},{s['timestamp_sec']:.4f},{s['gyro_x_dps']:.2f},{s['gyro_y_dps']:.2f},{s['gyro_z_dps']:.2f},{s['gyro_mag_dps']:.2f},{s['accel_x_g']:.3f},{s['accel_y_g']:.3f},{s['accel_z_g']:.3f},{s['accel_mag_g']:.3f}\n"
+        lines.append(line)
+        # Also ensure per-frame CSV exists
+        per_frame_path = os.path.join(sequence_dir, f"gopro_imu_{s['frame_index']:03d}.csv")
+        try:
+            with open(per_frame_path, "w", encoding="utf-8") as ff:
+                ff.write(header)
+                ff.write(line)
+        except Exception:
+            pass
+
+    with open(out_csv_path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+    return out_csv_path
