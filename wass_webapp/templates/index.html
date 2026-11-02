@@ -497,7 +497,7 @@
           <!-- Column 1: Synchronized Video Player, Scrubber, Disparity & Dataset Selector -->
           <div class="cockpit-card h-100 d-flex flex-column overflow-hidden" id="videoStreamCard">
             <div class="cockpit-card-header">
-              <span><i class="fa-solid fa-film me-2 text-primary"></i> Synchronized Video Streams</span>
+              <span>Synchronized Video Streams</span>
               <span class="pill-badge" id="frameCounterBadge">Frame 00 / 149</span>
             </div>
             <div class="cockpit-card-body gap-2 overflow-y-auto p-2 d-flex flex-column">
@@ -506,16 +506,16 @@
               <div class="d-flex justify-content-between align-items-center flex-shrink-0">
                 <div class="btn-group btn-group-sm" role="group" id="streamModeGroup">
                   <button type="button" class="btn btn-outline-custom py-0 px-2 active" id="btnStreamDual" onclick="setStreamMode('dual')" title="Side-by-side view of both synchronized stereo cameras">
-                    <i class="fa-solid fa-table-columns me-1"></i> Dual Streams (SBS)
+                    Dual Streams (SBS)
                   </button>
                   <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamLeft" onclick="setStreamMode('left')" title="Left Camera Cam 0 (GX010077)">
-                    <i class="fa-solid fa-camera me-1"></i> Cam 0 (Left)
+                    Cam 0 (Left)
                   </button>
                   <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamRight" onclick="setStreamMode('right')" title="Right Camera Cam 1 (GX011273)">
-                    <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right)
+                    Cam 1 (Right)
                   </button>
                   <button type="button" class="btn btn-outline-custom py-0 px-2" id="btnStreamDisp" onclick="setStreamMode('disparity')" title="Dense Stereo Disparity Field">
-                    <i class="fa-solid fa-water me-1"></i> Dense Disparity
+                    Dense Disparity
                   </button>
                 </div>
                 <span class="pill-badge" id="streamModeBadge">Dual Stereo (SBS)</span>
@@ -583,7 +583,7 @@
               <!-- Disparity Map Preview -->
               <div class="flex-shrink-0">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <span class="stat-label mb-0"><i class="fa-solid fa-water text-warning me-1"></i> Dense Stereo Disparity / Sea Depth Field</span>
+                  <span class="stat-label mb-0">Dense Stereo Disparity / Sea Depth Field</span>
                 </div>
                 <div class="text-center bg-dark rounded border overflow-hidden" style="border-color: var(--border-subtle) !important;">
                   <img id="liveDispPlayer" src="/workspace/sequence/disparity_000.png?t=v3" class="img-fluid" style="max-height: 120px; width: 100%; object-fit: contain;" alt="Disparity Depth Map" onerror="handleMediaError(this, 'disparity')">
@@ -595,10 +595,10 @@
                 <!-- Header Toolbar: Title & GPMF Badge -->
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span class="stat-label mb-0 fw-bold" style="font-size: 0.72rem;">
-                    <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU Telemetry
+                    GoPro IMU Telemetry
                   </span>
                   <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.62rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
-                    <i class="fa-solid fa-circle-check me-1"></i> Dual Cam GPMF
+                    Dual Cam GPMF
                   </span>
                 </div>
 
@@ -614,7 +614,7 @@
                   </select>
                   <div class="form-check form-switch m-0 d-flex align-items-center gap-1" id="imuAudioSyncWrap" title="Synchronize dual camera IMUs using motion & shutter cross-correlation offset">
                     <input class="form-check-input my-0" type="checkbox" id="imuAudioSyncCheck" checked style="cursor: pointer; height: 13px; width: 25px;" onchange="toggleImuAudioSync(this.checked)">
-                    <label class="form-check-label font-monospace" for="imuAudioSyncCheck" style="font-size: 0.60rem; cursor: pointer; color: #38bdf8; white-space: nowrap;" id="imuAudioSyncLabel"><i class="fa-solid fa-bolt text-warning me-1"></i> Sync: <b>ON</b> (+23.6s)</label>
+                    <label class="form-check-label font-monospace" for="imuAudioSyncCheck" style="font-size: 0.60rem; cursor: pointer; color: #38bdf8; white-space: nowrap;" id="imuAudioSyncLabel">Sync: <b>ON</b> (+23.6s)</label>
                   </div>
                 </div>
 
@@ -624,7 +624,7 @@
                   <div class="p-1.5 rounded border mb-2" id="imuCam0Card" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(56, 189, 248, 0.4) !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                       <span class="fw-bold text-info" style="font-size: 0.68rem;" id="imuCam0Title">
-                        <i class="fa-solid fa-camera me-1"></i> Cam 0 (Left - Top)
+                        Cam 0 (Left - Top)
                       </span>
                       <span class="font-monospace text-secondary" style="font-size: 0.60rem;" id="imuCam0Feed">GX010077</span>
                     </div>
@@ -632,7 +632,7 @@
                     <!-- Cam 0 Gyroscope with explicit X, Y, Z labels -->
                     <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
                       <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
-                        <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyroscope (deg/s)</span>
+                        <span class="text-warning fw-semibold">Gyroscope (deg/s)</span>
                         <span class="font-monospace text-muted" id="imuCam0GyroTotal">|ω|: 0.00°/s</span>
                       </div>
                       <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
@@ -657,7 +657,7 @@
                     <!-- Cam 0 Accelerometer with explicit X, Y, Z labels -->
                     <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
                       <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
-                        <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accelerometer (g)</span>
+                        <span class="text-info fw-semibold">Accelerometer (g)</span>
                         <span class="font-monospace text-success fw-bold" id="imuCam0AccelTotal">|a|: 1.000 g</span>
                       </div>
                       <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
@@ -684,7 +684,7 @@
                   <div class="p-1.5 rounded border mb-2" id="imuCam1Card" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(168, 85, 247, 0.4) !important;">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                       <span class="fw-bold" style="font-size: 0.68rem; color: #c084fc;" id="imuCam1Title">
-                        <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right - Bottom)
+                        Cam 1 (Right - Bottom)
                       </span>
                       <div class="d-flex align-items-center gap-1">
                         <span class="badge border font-monospace" style="font-size: 0.54rem; background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.35) !important;" id="imuCam1SyncPill">t + 23.6s</span>
@@ -695,7 +695,7 @@
                     <!-- Cam 1 Gyroscope with explicit X, Y, Z labels -->
                     <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
                       <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
-                        <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyroscope (deg/s)</span>
+                        <span class="text-warning fw-semibold">Gyroscope (deg/s)</span>
                         <span class="font-monospace text-muted" id="imuCam1GyroTotal">|ω|: 0.00°/s</span>
                       </div>
                       <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
@@ -720,14 +720,14 @@
                     <!-- Cam 1 Accelerometer with explicit X, Y, Z labels -->
                     <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
                       <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
-                        <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accelerometer (g)</span>
+                        <span class="text-info fw-semibold">Accelerometer (g)</span>
                         <span class="font-monospace text-success fw-bold" id="imuCam1AccelTotal">|a|: 1.000 g</span>
                       </div>
                       <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
                         <div class="flex-fill">
                           <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">X</span>
                           <span class="text-muted" style="font-size: 0.52rem;">Surge:</span>
-                          <span class="fw-bold" style="color: #f43f5e;" id="imuCam1AccelX">+0.000</span>
+                          <span class="fw-bold" style="color: #f43f5e;" id="imuCam0AccelX">+0.000</span>
                         </div>
                         <div class="flex-fill border-start border-secondary border-opacity-25">
                           <span class="badge bg-success-subtle text-success border border-success-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Y</span>
@@ -748,7 +748,7 @@
                 <div class="p-1 rounded border mb-1" id="imuBaselineDiffStrip" style="background: rgba(15, 23, 42, 0.7); border-color: rgba(245, 158, 11, 0.35) !important;">
                   <div class="d-flex justify-content-between align-items-center font-monospace mb-1" style="font-size: 0.60rem;">
                     <span class="text-warning fw-semibold">
-                      <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Baseline Differential (Δ Cam 1 - Cam 0):
+                      Baseline Differential (Δ Cam 1 - Cam 0):
                     </span>
                     <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace" style="font-size: 0.52rem;" id="imuDiffSyncTag">Shutter Aligned (+23.6s)</span>
                   </div>
@@ -823,10 +823,10 @@
                   <!-- Export Action Buttons -->
                   <div class="d-flex justify-content-between gap-1 mt-1 pt-1 border-top" style="border-color: rgba(255, 255, 255, 0.08) !important;">
                     <button type="button" class="btn btn-outline-info py-0 px-2 flex-grow-1" style="font-size: 0.62rem;" onclick="exportCurrentFrameImuCsv()" title="Export 3-axis IMU CSV for current loaded frame">
-                      <i class="fa-solid fa-file-csv me-1"></i> Frame IMU CSV
+                      Frame IMU CSV
                     </button>
                     <button type="button" class="btn btn-outline-custom py-0 px-2 flex-grow-1" style="font-size: 0.62rem;" onclick="exportAllImuCsv()" title="Export synchronized 3-axis IMU CSV for entire sequence">
-                      <i class="fa-solid fa-file-zipper me-1"></i> Sequence IMU CSV
+                      Sequence IMU CSV
                     </button>
                   </div>
                 </div>
@@ -889,7 +889,7 @@
               <!-- Interaction Toolbar -->
               <div class="d-flex justify-content-between align-items-center mt-1 px-1 flex-shrink-0">
                 <span class="small text-muted font-monospace" style="font-size: 0.72rem;"><i class="fa-solid fa-arrows-up-down-left-right me-1"></i> Left: Rotate | Right: Pan | Scroll: Zoom</span>
-                <button type="button" class="btn btn-outline-custom btn-sm py-0 px-2" style="font-size: 0.72rem;" onclick="resetCamera()"><i class="fa-solid fa-camera-rotate me-1"></i> Reset View</button>
+                <button type="button" class="btn btn-outline-custom btn-sm py-0 px-2" style="font-size: 0.72rem;" onclick="resetCamera()">Reset View</button>
               </div>
 
               <!-- Instrument Specifications Strip -->
@@ -1128,7 +1128,7 @@
 
                 <div class="row g-2 mb-3">
                   <div class="col-6">
-                    <label class="form-label"><i class="fa-solid fa-camera me-1"></i> GoPro Model</label>
+                    <label class="form-label">GoPro Model</label>
                     <select class="form-select" id="goproModel">
                       <option value="auto" selected>Auto-Detect (Container / GPMF)</option>
                       <option value="hero11_12_13">GoPro HERO 11/12/13 (1/1.9" 8:7)</option>
@@ -3126,7 +3126,7 @@
               } else if (data.source && data.source.includes('GPMF')) {
                 srcLabel = '200 Hz GPMF';
               }
-              badge.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> ${srcLabel}`;
+              badge.textContent = srcLabel;
               badge.title = data.source || 'Genuine GoPro Physical IMU Telemetry';
             }
 
@@ -3164,7 +3164,7 @@
 
       const lbl = document.getElementById('imuAudioSyncLabel');
       if (lbl) {
-        lbl.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> Syncing...`;
+        lbl.textContent = 'Syncing...';
       }
 
       try {
@@ -3214,11 +3214,11 @@
       if (lbl) {
         if (isEnabled) {
           lbl.style.color = '#38bdf8';
-          lbl.innerHTML = `<i class="fa-solid fa-bolt text-warning me-1"></i> Sync: <b>ON</b> (${offsetDisplay})`;
+          lbl.innerHTML = `Sync: <b>ON</b> (${offsetDisplay})`;
           lbl.title = `Physical motion & shutter cross-correlation: ${offsetDisplay} temporal shift applied to Cam 1`;
         } else {
           lbl.style.color = '#94a3b8';
-          lbl.innerHTML = `<i class="fa-solid fa-power-off me-1"></i> Sync: <b>OFF</b> (0s)`;
+          lbl.innerHTML = `Sync: <b>OFF</b> (0s)`;
           lbl.title = `Raw unshifted video frame alignment (no shutter correction)`;
         }
       }
@@ -3241,7 +3241,7 @@
       try {
         const badge = document.getElementById('imuBadgeSource');
         if (badge) {
-          badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> Loading Feed...`;
+          badge.textContent = 'Loading Feed...';
         }
         await fetch('/api/telemetry/imu/select_feed', {
           method: 'POST',
@@ -3447,9 +3447,9 @@
       if (diffStrip) diffStrip.style.display = isStereo ? 'block' : 'none';
       const c0Title = document.getElementById('imuCam0Title');
       if (c0Title) {
-        c0Title.innerHTML = isStereo
-          ? '<i class="fa-solid fa-camera me-1"></i> Cam 0 (Left - Top)'
-          : `<i class="fa-solid fa-camera me-1"></i> ${c0.feed ? c0.feed.replace('.MP4','') : 'Camera IMU'}`;
+        c0Title.textContent = isStereo
+          ? 'Cam 0 (Left - Top)'
+          : (c0.feed ? c0.feed.replace('.MP4','') : 'Camera IMU');
       }
 
       // Legacy/backward-compatible single-cam DOM elements
