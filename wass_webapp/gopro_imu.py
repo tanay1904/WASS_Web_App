@@ -183,7 +183,7 @@ def generate_wave_coupled_imu_series(total_frames=150, fps=30.0, base_hs=2.56, p
 KNOWN_CAMERA_FEEDS = [
     {
         "id": "pair1_stereo",
-        "name": "★ Stereo Rig: Pair 1 (Cam 0 + Cam 1)",
+        "name": "Stereo Rig: Pair 1 (Cam 0 + Cam 1)",
         "video": "GX010077.MP4+GX011273.MP4",
         "pair": "pair1",
         "camera": "stereo",
@@ -195,7 +195,7 @@ KNOWN_CAMERA_FEEDS = [
     },
     {
         "id": "pair2_stereo",
-        "name": "★ Stereo Rig: Pair 2 (Cam 0 + Cam 1)",
+        "name": "Stereo Rig: Pair 2 (Cam 0 + Cam 1)",
         "video": "GX010078.MP4+GX011274.MP4",
         "pair": "pair2",
         "camera": "stereo",
@@ -1185,18 +1185,10 @@ def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_fr
         gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
         ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
 
-        if s.get("is_stereo"):
-            c0_gx, c0_gy, c0_gz = s['cam0_gyro_x_dps'], s['cam0_gyro_y_dps'], s['cam0_gyro_z_dps']
-            c0_ax, c0_ay, c0_az = s['cam0_accel_x_g'], s['cam0_accel_y_g'], s['cam0_accel_z_g']
-            c1_gx, c1_gy, c1_gz = s['cam1_gyro_x_dps'], s['cam1_gyro_y_dps'], s['cam1_gyro_z_dps']
-            c1_ax, c1_ay, c1_az = s['cam1_accel_x_g'], s['cam1_accel_y_g'], s['cam1_accel_z_g']
-            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f},{c0_gx:.2f},{c0_gy:.2f},{c0_gz:.2f},{c0_ax:.3f},{c0_ay:.3f},{c0_az:.3f},{c1_gx:.2f},{c1_gy:.2f},{c1_gz:.2f},{c1_ax:.3f},{c1_ay:.3f},{c1_az:.3f}\n"
-            ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g\n"
-            arc_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g,cam0_gyro_x_dps,cam0_gyro_y_dps,cam0_gyro_z_dps,cam0_accel_x_g,cam0_accel_y_g,cam0_accel_z_g,cam1_gyro_x_dps,cam1_gyro_y_dps,cam1_gyro_z_dps,cam1_accel_x_g,cam1_accel_y_g,cam1_accel_z_g\n"
-        else:
-            imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
-            ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
-            arc_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\n"
+        ann_header = "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        arc_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
+        arc_sum_header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\n"
 
         ann_path = os.path.join(sequence_dir, f"annotated_points_{idx:03d}.csv")
         if os.path.exists(ann_path):
@@ -1225,6 +1217,21 @@ def switch_sequence_imu_feed(sequence_dir, video_source="pair1_stereo", total_fr
                         new_lines.append(",".join(parts) + imu_suffix)
                     with open(arc_path, "w", encoding="utf-8") as arcf:
                         arcf.writelines(new_lines)
+            except Exception:
+                pass
+
+        arc_sum_path = os.path.join(sequence_dir, f"circular_arcs_{idx:03d}.csv")
+        if os.path.exists(arc_sum_path):
+            try:
+                with open(arc_sum_path, "r", encoding="utf-8") as asf:
+                    lines = asf.readlines()
+                if lines:
+                    new_lines = [arc_sum_header]
+                    for line in lines[1:]:
+                        parts = line.strip().split(",")[:12]
+                        new_lines.append(",".join(parts) + imu_suffix)
+                    with open(arc_sum_path, "w", encoding="utf-8") as asf:
+                        asf.writelines(new_lines)
             except Exception:
                 pass
 
@@ -1354,19 +1361,52 @@ def extract_frame_imu_scalars(frame_dict):
     return res
 
 
+def get_frame_imu_entry(sequence_dir, frame_idx):
+    """
+    Safely retrieves the IMU telemetry dictionary for a specific frame index.
+    Checks gopro_imu_telemetry.json first, falls back to get_or_extract_sequence_imu.
+    """
+    json_path = os.path.join(sequence_dir, "gopro_imu_telemetry.json")
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            frames = data.get("frames", [])
+            if 0 <= frame_idx < len(frames):
+                return frames[frame_idx]
+            elif frames:
+                return frames[min(frame_idx, len(frames) - 1)]
+        except Exception:
+            pass
+    try:
+        data = get_or_extract_sequence_imu(sequence_dir)
+        frames = data.get("frames", [])
+        if 0 <= frame_idx < len(frames):
+            return frames[frame_idx]
+        elif frames:
+            return frames[min(frame_idx, len(frames) - 1)]
+    except Exception:
+        pass
+    return None
+
+
+def get_frame_imu_scalars(sequence_dir, frame_idx):
+    """
+    Returns extracted IMU scalar floats (gyro x,y,z, accel x,y,z, stereo fields if applicable)
+    for a specific frame index from sequence cache.
+    """
+    entry = get_frame_imu_entry(sequence_dir, frame_idx)
+    return extract_frame_imu_scalars(entry) if entry else {}
+
+
 def export_frame_imu_csv(sequence_dir, frame_idx, imu_entry=None, out_csv_path=None):
     """
     Exports a single frame's 3-axis IMU telemetry (Gyroscope and Accelerometer) to CSV.
     Supports both single-camera and dual-camera stereo formats.
     """
     if imu_entry is None:
-        seq_imu = get_or_extract_sequence_imu(sequence_dir)
-        frames = seq_imu.get("frames", [])
-        if 0 <= frame_idx < len(frames):
-            imu_entry = frames[frame_idx]
-        elif frames:
-            imu_entry = frames[min(frame_idx, len(frames) - 1)]
-        else:
+        imu_entry = get_frame_imu_entry(sequence_dir, frame_idx)
+        if imu_entry is None:
             imu_entry = {"frame_index": frame_idx, "timestamp_sec": float(frame_idx)/30.0}
 
     s = extract_frame_imu_scalars(imu_entry)

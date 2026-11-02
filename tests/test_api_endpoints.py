@@ -82,7 +82,9 @@ def test_export_arcs_csv():
     if len(lines) == 1:
         lines = response.text.strip().split("\n")
     expected_header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg"
-    assert lines[0] == expected_header
+    assert lines[0].startswith(expected_header)
+    assert "gyro_x_dps" in lines[0]
+    assert "accel_x_g" in lines[0]
     assert len(lines) == 11 # 1 header + 10 arc rows
 
 

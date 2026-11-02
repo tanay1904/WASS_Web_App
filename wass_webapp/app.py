@@ -934,7 +934,7 @@ def index():
 
 @app.get("/favicon.ico")
 def favicon():
-    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🌊</text></svg>'
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#0dcaf0"/><text x="50" y="70" font-size="60" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-weight="bold">W</text></svg>'
     return Response(content=svg, media_type="image/svg+xml")
 
 
@@ -1377,46 +1377,72 @@ def export_all_arcs_zip():
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for i in range(total_frames):
-            # 1. Circumference points CSV (1-deg resolution, 1610 points)
+            # 1. Circumference points CSV (1-deg resolution, 1610 points with IMU telemetry)
             arc_csv = os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv")
             if not os.path.exists(arc_csv):
                 xyz_path = os.path.join(seq_dir, f"points_{i:03d}.xyz")
                 if os.path.exists(xyz_path):
                     try:
+                        from wass_webapp.gopro_imu import get_frame_imu_entry
+                        frame_imu = get_frame_imu_entry(seq_dir, i)
                         _, pts_arr, _, h_sea = analyze_xyz(xyz_path)
-                        export_circular_arcs_circumference_csv(pts_arr, h_sea, arc_csv, frame_idx=i)
+                        export_circular_arcs_circumference_csv(pts_arr, h_sea, arc_csv, frame_idx=i, imu_telemetry=frame_imu)
                     except Exception:
                         pass
             if os.path.exists(arc_csv):
                 zip_file.write(arc_csv, arcname=f"circular_arcs_points_frame_{i:03d}.csv")
 
-            # 2. Classified annotated points CSV
+            # 2. Classified annotated points CSV (with IMU telemetry)
             ann_csv = os.path.join(seq_dir, f"annotated_points_{i:03d}.csv")
+            if not os.path.exists(ann_csv):
+                xyz_path = os.path.join(seq_dir, f"points_{i:03d}.xyz")
+                if os.path.exists(xyz_path):
+                    try:
+                        from wass_webapp.analyze_wave_xyz import export_annotated_wave_points_csv
+                        from wass_webapp.gopro_imu import get_frame_imu_entry
+                        frame_imu = get_frame_imu_entry(seq_dir, i)
+                        _, pts_arr, dist_arr, h_sea = analyze_xyz(xyz_path)
+                        export_annotated_wave_points_csv(pts_arr, dist_arr, h_sea, ann_csv, imu_telemetry=frame_imu)
+                    except Exception:
+                        pass
             if os.path.exists(ann_csv):
                 zip_file.write(ann_csv, arcname=f"annotated_points_frame_{i:03d}.csv")
 
-            # 3. 5m Circular Arcs Summary CSV
-            analysis_json = os.path.join(seq_dir, f"wave_analysis_{i:03d}.json")
-            if os.path.exists(analysis_json):
-                try:
-                    with open(analysis_json, "r") as fa:
-                        data = json.load(fa)
-                    arcs = data.get("circular_arcs_5m", [])
-                    if arcs:
-                        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
-                        rows = [header]
-                        for a in arcs:
-                            if not isinstance(a, dict):
-                                continue
-                            az_min = float(a.get("azimuth_min_deg") or 0.0)
-                            az_max = float(a.get("azimuth_max_deg") or 0.0)
-                            az_span = round(float(az_max - az_min), 1)
-                            r_band = str(a.get("band_m", ""))
-                            hs_val = float(a.get("significant_height_Hs_m", a.get("Hs_m", 0.0)) or 0.0)
-                            rows.append(f"{a.get('radius_m', 0.0)},{r_band},{a.get('point_count', 0)},{a.get('mean_elevation_m', 0.0)},{a.get('crest_m', 0.0)},{a.get('trough_m', 0.0)},{a.get('amplitude_m', 0.0)},{hs_val},{a.get('std_elevation_m', 0.0)},{az_min},{az_max},{az_span}\r\n")
-                        zip_file.writestr(f"circular_arcs_5m_frame_{i:03d}.csv", "".join(rows))
-                except Exception:
-                    pass
+            # 3. 5m Circular Arcs Summary CSV (with IMU telemetry)
+            arc_5m_file = os.path.join(seq_dir, f"circular_arcs_{i:03d}.csv")
+            if os.path.exists(arc_5m_file):
+                zip_file.write(arc_5m_file, arcname=f"circular_arcs_5m_frame_{i:03d}.csv")
+            else:
+                analysis_json = os.path.join(seq_dir, f"wave_analysis_{i:03d}.json")
+                if os.path.exists(analysis_json):
+                    try:
+                        with open(analysis_json, "r") as fa:
+                            data = json.load(fa)
+                        arcs = data.get("circular_arcs_5m", [])
+                        if arcs:
+                            from wass_webapp.gopro_imu import get_frame_imu_scalars
+                            s = get_frame_imu_scalars(seq_dir, i)
+                            if s and "gyro_x_dps" in s:
+                                header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\r\n"
+                                gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
+                                ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
+                                imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\r\n"
+                            else:
+                                header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
+                                imu_suffix = "\r\n"
+                            rows = [header]
+                            for a in arcs:
+                                if not isinstance(a, dict):
+                                    continue
+                                az_min = float(a.get("azimuth_min_deg") or 0.0)
+                                az_max = float(a.get("azimuth_max_deg") or 0.0)
+                                az_span = round(float(az_max - az_min), 1)
+                                r_band = str(a.get("band_m", ""))
+                                hs_val = float(a.get("significant_height_Hs_m", a.get("Hs_m", 0.0)) or 0.0)
+                                rows.append(f"{a.get('radius_m', 0.0)},{r_band},{a.get('point_count', 0)},{a.get('mean_elevation_m', 0.0)},{a.get('crest_m', 0.0)},{a.get('trough_m', 0.0)},{a.get('amplitude_m', 0.0)},{hs_val},{a.get('std_elevation_m', 0.0)},{az_min},{az_max},{az_span}{imu_suffix}")
+                            zip_file.writestr(f"circular_arcs_5m_frame_{i:03d}.csv", "".join(rows))
+                    except Exception:
+                        pass
 
             # 4. GoPro IMU Telemetry CSV (3-axis Gyroscope & Accelerometer for each frame)
             imu_csv = os.path.join(seq_dir, f"gopro_imu_{i:03d}.csv")
@@ -1602,7 +1628,23 @@ def export_circular_arcs_csv(target: str):
     if not arcs or not isinstance(arcs, list):
         return JSONResponse({"error": "No circular arc data found"}, status_code=404)
 
-    header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
+    s = {}
+    if idx is not None:
+        try:
+            from wass_webapp.gopro_imu import get_frame_imu_scalars
+            s = get_frame_imu_scalars(os.path.join(WORK_DIR, "sequence"), idx)
+        except Exception:
+            s = {}
+
+    if s and "gyro_x_dps" in s:
+        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g\r\n"
+        gx, gy, gz = s['gyro_x_dps'], s['gyro_y_dps'], s['gyro_z_dps']
+        ax, ay, az = s['accel_x_g'], s['accel_y_g'], s['accel_z_g']
+        imu_suffix = f",{gx:.2f},{gy:.2f},{gz:.2f},{ax:.3f},{ay:.3f},{az:.3f}\r\n"
+    else:
+        header = "arc_radius_m,range_band,vertex_count,mean_elevation_m,peak_crest_m,deepest_trough_m,wave_amplitude_m,significant_wave_height_Hs_m,elevation_std_sigma_m,azimuth_min_deg,azimuth_max_deg,azimuth_span_deg\r\n"
+        imu_suffix = "\r\n"
+
     csv_rows = [header]
     for a in arcs:
         if not isinstance(a, dict):
@@ -1624,7 +1666,8 @@ def export_circular_arcs_csv(target: str):
             f"{a.get('std_elevation_m', 0.0)},"
             f"{az_min},"
             f"{az_max},"
-            f"{az_span}\r\n"
+            f"{az_span}"
+            f"{imu_suffix}"
         )
         csv_rows.append(row)
 
@@ -1679,8 +1722,10 @@ def export_circumference_csv(target: str):
             xyz_path = os.path.join(WORK_DIR, "sequence", f"points_{idx:03d}.xyz")
             if os.path.exists(xyz_path):
                 try:
+                    from wass_webapp.gopro_imu import get_frame_imu_entry
+                    frame_imu = get_frame_imu_entry(os.path.join(WORK_DIR, "sequence"), idx)
                     _, pts_arr, _, h_sea = analyze_xyz(xyz_path)
-                    export_circular_arcs_circumference_csv(pts_arr, h_sea, circ_csv, frame_idx=idx)
+                    export_circular_arcs_circumference_csv(pts_arr, h_sea, circ_csv, frame_idx=idx, imu_telemetry=frame_imu)
                 except Exception:
                     pass
         if os.path.exists(circ_csv):
