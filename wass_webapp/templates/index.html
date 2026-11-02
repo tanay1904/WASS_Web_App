@@ -2963,7 +2963,7 @@
       if (aTotEl) aTotEl.innerText = `|a|: ${totA.toFixed(3)} g`;
 
       const idxLbl = document.getElementById('imuSampleIdxLbl');
-      if (idxLbl) idxLbl.innerText = `Frame ${idx}`;
+      if (idxLbl) idxLbl.innerText = `Loaded: Frame ${idx} / ${imuSequenceData.length - 1}`;
 
       drawImuMotionCanvas(idx);
     }
@@ -2978,43 +2978,63 @@
       const h = cvs.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Baseline center line
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      const total = imuSequenceData.length;
+      if (total <= 1) return;
+
+      const clampedCur = Math.max(0, Math.min(curIdx, total - 1));
+
+      // 1. Future/unloaded track background (faint dashed baseline)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.lineWidth = 1;
+      ctx.setLineDash([2, 4]);
       ctx.beginPath();
       ctx.moveTo(0, h / 2);
       ctx.lineTo(w, h / 2);
       ctx.stroke();
+      ctx.setLineDash([]); // Reset dash
 
-      const total = imuSequenceData.length;
-      if (total <= 1) return;
+      // 2. Determine buffer window: in circular buffer mode, past pruned frames roll off
+      const isBufferPruned = (typeof totalFrames === 'number' && totalFrames > 300 && clampedCur >= 300);
+      const startIdx = isBufferPruned ? (clampedCur - 300) : 0;
 
-      // Draw Raw Gyroscope Rate (Amber, scaled to +/- 15 deg/s)
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.5;
+      const startX = (startIdx / (total - 1)) * w;
+      const curX = (clampedCur / (total - 1)) * w;
+
+      // Active baseline up to currently loaded frame
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      for (let i = 0; i < total; i++) {
-        const x = (i / (total - 1)) * w;
-        const gVal = (imuSequenceData[i].gyroscope?.rate_roll_dps || imuSequenceData[i].gyroscope?.x_dps || 0.0);
-        const y = (h / 2) - (gVal / 12.0) * (h / 2 * 0.85);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
+      ctx.moveTo(startX, h / 2);
+      ctx.lineTo(curX, h / 2);
       ctx.stroke();
 
-      // Draw Raw Acceleration (Cyan, scaled to heave perturbation +/- 0.5g)
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let i = 0; i < total; i++) {
-        const x = (i / (total - 1)) * w;
-        const aVal = (imuSequenceData[i].accelerometer?.heave_az_g || imuSequenceData[i].accelerometer?.z_g || 1.0) - 1.0;
-        const y = (h / 2) - (aVal / 0.4) * (h / 2 * 0.85);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
+      if (clampedCur > startIdx) {
+        // 3. Draw Raw Gyroscope Rate (Amber) ONLY up to currently loaded frame
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let i = startIdx; i <= clampedCur; i++) {
+          const x = (i / (total - 1)) * w;
+          const gVal = (imuSequenceData[i].gyroscope?.rate_roll_dps || imuSequenceData[i].gyroscope?.x_dps || 0.0);
+          const y = (h / 2) - (gVal / 12.0) * (h / 2 * 0.85);
+          if (i === startIdx) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
 
-      // Draw Playhead
-      const curX = (curIdx / (total - 1)) * w;
+        // 4. Draw Raw Acceleration Heave (Cyan) ONLY up to currently loaded frame
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let i = startIdx; i <= clampedCur; i++) {
+          const x = (i / (total - 1)) * w;
+          const aVal = (imuSequenceData[i].accelerometer?.heave_az_g || imuSequenceData[i].accelerometer?.z_g || 1.0) - 1.0;
+          const y = (h / 2) - (aVal / 0.4) * (h / 2 * 0.85);
+          if (i === startIdx) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // 5. Leading Playhead Cursor at the frontier of loaded video
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -3022,12 +3042,19 @@
       ctx.lineTo(curX, h);
       ctx.stroke();
 
-      // Cursor indicator dot on active sample
-      const curG = (imuSequenceData[curIdx]?.gyroscope?.rate_roll_dps || imuSequenceData[curIdx]?.gyroscope?.x_dps || 0.0);
-      const curY = (h / 2) - (curG / 12.0) * (h / 2 * 0.85);
+      // Leading edge glow cursor dots
+      const curG = (imuSequenceData[clampedCur]?.gyroscope?.rate_roll_dps || imuSequenceData[clampedCur]?.gyroscope?.x_dps || 0.0);
+      const curGyY = (h / 2) - (curG / 12.0) * (h / 2 * 0.85);
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
-      ctx.arc(curX, curY, 3, 0, Math.PI * 2);
+      ctx.arc(curX, curGyY, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      const curA = (imuSequenceData[clampedCur]?.accelerometer?.heave_az_g || imuSequenceData[clampedCur]?.accelerometer?.z_g || 1.0) - 1.0;
+      const curAyY = (h / 2) - (curA / 0.4) * (h / 2 * 0.85);
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(curX, curAyY, 3, 0, Math.PI * 2);
       ctx.fill();
     }
 
