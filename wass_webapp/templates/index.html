@@ -592,100 +592,152 @@
 
               <!-- GoPro Raw IMU Telemetry (InvenSense ICM-20689 Binocular Rig) -->
               <div class="flex-shrink-0 p-2 rounded" style="background-color: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);" id="goproImuCard">
+                <!-- Header Toolbar: Title & GPMF Badge -->
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <div class="d-flex align-items-center gap-1">
-                    <span class="stat-label mb-0">
-                      <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU:
-                    </span>
-                    <select class="form-select form-select-sm py-0 px-1 font-monospace" id="imuFeedSelector" style="font-size: 0.65rem; height: 21px; width: auto; background-color: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-primary); cursor: pointer;" onchange="switchCameraImuFeed(this.value)" title="Select physical GoPro camera sensor feed or stereo pair">
-                      <option value="pair1_stereo" selected>★ Stereo Rig: Pair 1 (Cam 0 + Cam 1)</option>
-                      <option value="pair2_stereo">★ Stereo Rig: Pair 2 (Cam 0 + Cam 1)</option>
-                      <option value="GX010077.MP4">Cam 0 (Pair 1 Left - GX010077)</option>
-                      <option value="GX011273.MP4">Cam 1 (Pair 1 Right - GX011273)</option>
-                      <option value="GX010078.MP4">Cam 0 (Pair 2 Left - GX010078)</option>
-                      <option value="GX011274.MP4">Cam 1 (Pair 2 Right - GX011274)</option>
-                    </select>
-                  </div>
-                  <div class="d-flex align-items-center gap-2">
-                    <div class="form-check form-switch m-0 d-flex align-items-center gap-1" id="imuAudioSyncWrap" title="Synchronize dual camera IMUs using acoustic cross-correlation offset">
-                      <input class="form-check-input my-0" type="checkbox" id="imuAudioSyncCheck" checked style="cursor: pointer; height: 13px; width: 25px;" onchange="toggleImuAudioSync(this.checked)">
-                      <label class="form-check-label font-monospace" for="imuAudioSyncCheck" style="font-size: 0.60rem; cursor: pointer; color: #38bdf8;" id="imuAudioSyncLabel"><i class="fa-solid fa-microphone-lines text-warning me-1"></i> Audio Sync: ON (+33.3ms)</label>
-                    </div>
-                    <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
-                      <i class="fa-solid fa-circle-check me-1"></i> Dual Cam GPMF
-                    </span>
+                  <span class="stat-label mb-0 fw-bold" style="font-size: 0.72rem;">
+                    <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU Telemetry
+                  </span>
+                  <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.62rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
+                    <i class="fa-solid fa-circle-check me-1"></i> Dual Cam GPMF
+                  </span>
+                </div>
+
+                <!-- Controls Row: Feed Selector & Shutter/Audio Sync Switch -->
+                <div class="d-flex justify-content-between align-items-center gap-1 mb-2">
+                  <select class="form-select form-select-sm py-0 px-1 font-monospace flex-grow-1" id="imuFeedSelector" style="font-size: 0.65rem; height: 23px; max-width: 58%; background-color: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-primary); cursor: pointer;" onchange="switchCameraImuFeed(this.value)" title="Select physical GoPro camera sensor feed or stereo pair">
+                    <option value="pair1_stereo" selected>★ Stereo Rig: Pair 1 (Cam 0 + Cam 1)</option>
+                    <option value="pair2_stereo">★ Stereo Rig: Pair 2 (Cam 0 + Cam 1)</option>
+                    <option value="GX010077.MP4">Cam 0 (Pair 1 Left - GX010077)</option>
+                    <option value="GX011273.MP4">Cam 1 (Pair 1 Right - GX011273)</option>
+                    <option value="GX010078.MP4">Cam 0 (Pair 2 Left - GX010078)</option>
+                    <option value="GX011274.MP4">Cam 1 (Pair 2 Right - GX011274)</option>
+                  </select>
+                  <div class="form-check form-switch m-0 d-flex align-items-center gap-1" id="imuAudioSyncWrap" title="Synchronize dual camera IMUs using motion & shutter cross-correlation offset">
+                    <input class="form-check-input my-0" type="checkbox" id="imuAudioSyncCheck" checked style="cursor: pointer; height: 13px; width: 25px;" onchange="toggleImuAudioSync(this.checked)">
+                    <label class="form-check-label font-monospace" for="imuAudioSyncCheck" style="font-size: 0.60rem; cursor: pointer; color: #38bdf8; white-space: nowrap;" id="imuAudioSyncLabel"><i class="fa-solid fa-bolt text-warning me-1"></i> Sync: <b>ON</b> (+23.6s)</label>
                   </div>
                 </div>
 
-                <!-- Dual Camera Synchronized 3-Axis Telemetry Readouts -->
-                <div class="row g-1 mb-1">
-                  <!-- Cam 0 (Left Camera) Column -->
-                  <div class="col-6">
-                    <div class="p-1 rounded border h-100" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(56, 189, 248, 0.35) !important;">
-                      <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-bold text-info" style="font-size: 0.62rem;" id="imuCam0Title">
-                          <i class="fa-solid fa-camera me-1"></i> Cam 0 (Left)
-                        </span>
-                        <span class="font-monospace text-secondary" style="font-size: 0.58rem;" id="imuCam0Feed">GX010077</span>
+                <!-- Vertically Stacked Camera Readouts (Cam 0 on Top, Cam 1 Below) -->
+                <div class="w-100 mb-1" id="imuDualCamStack">
+                  <!-- Cam 0 (Left Camera) - Top Card -->
+                  <div class="p-1.5 rounded border mb-2" id="imuCam0Card" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(56, 189, 248, 0.4) !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="fw-bold text-info" style="font-size: 0.68rem;" id="imuCam0Title">
+                        <i class="fa-solid fa-camera me-1"></i> Cam 0 (Left - Top)
+                      </span>
+                      <span class="font-monospace text-secondary" style="font-size: 0.60rem;" id="imuCam0Feed">GX010077</span>
+                    </div>
+
+                    <!-- Cam 0 Gyroscope with explicit X, Y, Z labels -->
+                    <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
+                      <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
+                        <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyroscope (deg/s)</span>
+                        <span class="font-monospace text-muted" id="imuCam0GyroTotal">|ω|: 0.00°/s</span>
                       </div>
-                      <!-- Cam 0 Gyro -->
-                      <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
-                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
-                          <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyro (deg/s)</span>
-                          <span class="font-monospace text-muted" id="imuCam0GyroTotal">|ω|: 0.00°/s</span>
+                      <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
+                        <div class="flex-fill">
+                          <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">X</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Roll:</span>
+                          <span class="fw-bold" style="color: #f43f5e;" id="imuCam0GyroX">+0.00</span>
                         </div>
-                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
-                          <div><span class="text-muted" style="font-size: 0.52rem;">ωx:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam0GyroX">+0.00</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">ωy:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam0GyroY">+0.00</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">ωz:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam0GyroZ">+0.00</span></div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-success-subtle text-success border border-success-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Y</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Pitch:</span>
+                          <span class="fw-bold" style="color: #10b981;" id="imuCam0GyroY">+0.00</span>
+                        </div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-info-subtle text-info border border-info-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Z</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Yaw:</span>
+                          <span class="fw-bold" style="color: #38bdf8;" id="imuCam0GyroZ">+0.00</span>
                         </div>
                       </div>
-                      <!-- Cam 0 Accel -->
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
-                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
-                          <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accel (g)</span>
-                          <span class="font-monospace text-success fw-bold" id="imuCam0AccelTotal">|a|: 1.000 g</span>
+                    </div>
+
+                    <!-- Cam 0 Accelerometer with explicit X, Y, Z labels -->
+                    <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
+                      <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
+                        <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accelerometer (g)</span>
+                        <span class="font-monospace text-success fw-bold" id="imuCam0AccelTotal">|a|: 1.000 g</span>
+                      </div>
+                      <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
+                        <div class="flex-fill">
+                          <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">X</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Surge:</span>
+                          <span class="fw-bold" style="color: #f43f5e;" id="imuCam0AccelX">+0.000</span>
                         </div>
-                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
-                          <div><span class="text-muted" style="font-size: 0.52rem;">Ax:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam0AccelX">+0.000</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">Ay:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam0AccelY">+0.000</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">Az:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam0AccelZ">+1.000</span></div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-success-subtle text-success border border-success-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Y</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Sway:</span>
+                          <span class="fw-bold" style="color: #10b981;" id="imuCam0AccelY">+0.000</span>
+                        </div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-info-subtle text-info border border-info-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Z</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Heave:</span>
+                          <span class="fw-bold" style="color: #38bdf8;" id="imuCam0AccelZ">+1.000</span>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <!-- Cam 1 (Right Camera) Column -->
-                  <div class="col-6">
-                    <div class="p-1 rounded border h-100" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(168, 85, 247, 0.35) !important;">
-                      <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-bold" style="font-size: 0.62rem; color: #c084fc;" id="imuCam1Title">
-                          <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right)
-                        </span>
-                        <span class="font-monospace text-secondary" style="font-size: 0.58rem;" id="imuCam1Feed">GX011273</span>
+                  <!-- Cam 1 (Right Camera) - Bottom Card (Stacked Directly Below Cam 0) -->
+                  <div class="p-1.5 rounded border mb-2" id="imuCam1Card" style="background: rgba(14, 19, 29, 0.7); border-color: rgba(168, 85, 247, 0.4) !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="fw-bold" style="font-size: 0.68rem; color: #c084fc;" id="imuCam1Title">
+                        <i class="fa-solid fa-camera me-1"></i> Cam 1 (Right - Bottom)
+                      </span>
+                      <div class="d-flex align-items-center gap-1">
+                        <span class="badge border font-monospace" style="font-size: 0.54rem; background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.35) !important;" id="imuCam1SyncPill">t + 23.6s</span>
+                        <span class="font-monospace text-secondary" style="font-size: 0.60rem;" id="imuCam1Feed">GX011273</span>
                       </div>
-                      <!-- Cam 1 Gyro -->
-                      <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
-                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
-                          <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyro (deg/s)</span>
-                          <span class="font-monospace text-muted" id="imuCam1GyroTotal">|ω|: 0.00°/s</span>
+                    </div>
+
+                    <!-- Cam 1 Gyroscope with explicit X, Y, Z labels -->
+                    <div class="mb-1 p-1 rounded bg-dark border" style="border-color: rgba(244, 63, 94, 0.25) !important;">
+                      <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
+                        <span class="text-warning fw-semibold"><i class="fa-solid fa-rotate me-1"></i> Gyroscope (deg/s)</span>
+                        <span class="font-monospace text-muted" id="imuCam1GyroTotal">|ω|: 0.00°/s</span>
+                      </div>
+                      <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
+                        <div class="flex-fill">
+                          <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">X</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Roll:</span>
+                          <span class="fw-bold" style="color: #f43f5e;" id="imuCam1GyroX">+0.00</span>
                         </div>
-                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
-                          <div><span class="text-muted" style="font-size: 0.52rem;">ωx:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam1GyroX">+0.00</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">ωy:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam1GyroY">+0.00</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">ωz:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam1GyroZ">+0.00</span></div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-success-subtle text-success border border-success-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Y</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Pitch:</span>
+                          <span class="fw-bold" style="color: #10b981;" id="imuCam1GyroY">+0.00</span>
+                        </div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-info-subtle text-info border border-info-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Z</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Yaw:</span>
+                          <span class="fw-bold" style="color: #38bdf8;" id="imuCam1GyroZ">+0.00</span>
                         </div>
                       </div>
-                      <!-- Cam 1 Accel -->
-                      <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
-                        <div class="d-flex justify-content-between" style="font-size: 0.58rem;">
-                          <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accel (g)</span>
-                          <span class="font-monospace text-success fw-bold" id="imuCam1AccelTotal">|a|: 1.000 g</span>
+                    </div>
+
+                    <!-- Cam 1 Accelerometer with explicit X, Y, Z labels -->
+                    <div class="p-1 rounded bg-dark border" style="border-color: rgba(16, 185, 129, 0.25) !important;">
+                      <div class="d-flex justify-content-between align-items-center mb-1" style="font-size: 0.58rem;">
+                        <span class="text-info fw-semibold"><i class="fa-solid fa-gauge-high me-1"></i> Accelerometer (g)</span>
+                        <span class="font-monospace text-success fw-bold" id="imuCam1AccelTotal">|a|: 1.000 g</span>
+                      </div>
+                      <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.66rem; background: rgba(0,0,0,0.35);">
+                        <div class="flex-fill">
+                          <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">X</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Surge:</span>
+                          <span class="fw-bold" style="color: #f43f5e;" id="imuCam1AccelX">+0.000</span>
                         </div>
-                        <div class="d-flex justify-content-around font-monospace text-center mt-1" style="font-size: 0.65rem;">
-                          <div><span class="text-muted" style="font-size: 0.52rem;">Ax:</span> <span class="fw-bold" style="color: #f43f5e;" id="imuCam1AccelX">+0.000</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">Ay:</span> <span class="fw-bold" style="color: #10b981;" id="imuCam1AccelY">+0.000</span></div>
-                          <div><span class="text-muted" style="font-size: 0.52rem;">Az:</span> <span class="fw-bold" style="color: #38bdf8;" id="imuCam1AccelZ">+1.000</span></div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-success-subtle text-success border border-success-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Y</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Sway:</span>
+                          <span class="fw-bold" style="color: #10b981;" id="imuCam1AccelY">+0.000</span>
+                        </div>
+                        <div class="flex-fill border-start border-secondary border-opacity-25">
+                          <span class="badge bg-info-subtle text-info border border-info-subtle px-1 py-0 me-1" style="font-size: 0.56rem;">Z</span>
+                          <span class="text-muted" style="font-size: 0.52rem;">Heave:</span>
+                          <span class="fw-bold" style="color: #38bdf8;" id="imuCam1AccelZ">+1.000</span>
                         </div>
                       </div>
                     </div>
@@ -693,17 +745,19 @@
                 </div>
 
                 <!-- Stereo Baseline Differential Strip -->
-                <div class="p-1 rounded border mb-1" id="imuBaselineDiffStrip" style="background: rgba(15, 23, 42, 0.65); border-color: rgba(245, 158, 11, 0.3) !important;">
-                  <div class="d-flex justify-content-between align-items-center font-monospace" style="font-size: 0.6rem;">
+                <div class="p-1 rounded border mb-1" id="imuBaselineDiffStrip" style="background: rgba(15, 23, 42, 0.7); border-color: rgba(245, 158, 11, 0.35) !important;">
+                  <div class="d-flex justify-content-between align-items-center font-monospace mb-1" style="font-size: 0.60rem;">
                     <span class="text-warning fw-semibold">
-                      <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Baseline Differential (Δ Cam1 - Cam0):
+                      <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Baseline Differential (Δ Cam 1 - Cam 0):
                     </span>
-                    <span class="text-light d-flex align-items-center gap-1">
-                      <span class="text-muted me-1">Δ|ω|:</span><span class="fw-bold text-warning" id="imuDiffGyroMag">0.00°/s</span>
-                      <span class="text-muted mx-1">|</span>
-                      <span class="text-muted me-1">Δ|a|:</span><span class="fw-bold text-info" id="imuDiffAccelMag">0.000 g</span>
-                      <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace ms-1" style="font-size: 0.52rem;" id="imuDiffSyncTag">Acoustically Aligned</span>
-                    </span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace" style="font-size: 0.52rem;" id="imuDiffSyncTag">Shutter Aligned (+23.6s)</span>
+                  </div>
+                  <div class="d-flex justify-content-around font-monospace text-center py-0.5 rounded" style="font-size: 0.60rem; background: rgba(0,0,0,0.25);">
+                    <div><span class="text-muted">Δ|ω|:</span> <span class="fw-bold text-warning" id="imuDiffGyroMag">0.00°/s</span></div>
+                    <div class="border-start border-secondary border-opacity-25"></div>
+                    <div><span class="text-muted">Δ|a|:</span> <span class="fw-bold text-info" id="imuDiffAccelMag">0.000 g</span></div>
+                    <div class="border-start border-secondary border-opacity-25"></div>
+                    <div><span class="text-muted">ΔZ (Yaw):</span> <span class="fw-bold" style="color: #38bdf8;" id="imuDiffYawVal">0.00°/s</span></div>
                   </div>
                 </div>
 
@@ -3011,17 +3065,17 @@
       const aLegend = document.getElementById('imuAccelLegend');
 
       if (mode === 'dual') {
-        if (gLegend) gLegend.innerHTML = '<span class="text-info fw-semibold me-1">C0:</span><span style="color:#f43f5e;" class="me-1">● ωx</span><span style="color:#10b981;" class="me-1">● ωy</span><span style="color:#38bdf8;" class="me-2">● ωz</span><span style="color:#c084fc;" class="fw-semibold me-1">C1:</span><span style="color:#fb7185;" class="me-1">╌ ωx</span><span style="color:#34d399;" class="me-1">╌ ωy</span><span style="color:#7dd3fc;">╌ ωz</span>';
-        if (aLegend) aLegend.innerHTML = '<span class="text-info fw-semibold me-1">C0:</span><span style="color:#f43f5e;" class="me-1">● Ax</span><span style="color:#10b981;" class="me-1">● Ay</span><span style="color:#38bdf8;" class="me-2">● Az-1g</span><span style="color:#c084fc;" class="fw-semibold me-1">C1:</span><span style="color:#fb7185;" class="me-1">╌ Ax</span><span style="color:#34d399;" class="me-1">╌ Ay</span><span style="color:#7dd3fc;">╌ Az-1g</span>';
+        if (gLegend) gLegend.innerHTML = '<span class="text-info fw-semibold me-1">C0:</span><span style="color:#f43f5e;" class="me-1">● X (Roll)</span><span style="color:#10b981;" class="me-1">● Y (Pitch)</span><span style="color:#38bdf8;" class="me-2">● Z (Yaw)</span><span style="color:#c084fc;" class="fw-semibold me-1">C1:</span><span style="color:#fb7185;" class="me-1">╌ X</span><span style="color:#34d399;" class="me-1">╌ Y</span><span style="color:#7dd3fc;">╌ Z</span>';
+        if (aLegend) aLegend.innerHTML = '<span class="text-info fw-semibold me-1">C0:</span><span style="color:#f43f5e;" class="me-1">● X (Surge)</span><span style="color:#10b981;" class="me-1">● Y (Sway)</span><span style="color:#38bdf8;" class="me-2">● Z (Heave-1g)</span><span style="color:#c084fc;" class="fw-semibold me-1">C1:</span><span style="color:#fb7185;" class="me-1">╌ X</span><span style="color:#34d399;" class="me-1">╌ Y</span><span style="color:#7dd3fc;">╌ Z</span>';
       } else if (mode === 'cam0') {
-        if (gLegend) gLegend.innerHTML = '<span class="text-info fw-semibold me-1">Cam 0 (Left):</span><span style="color:#f43f5e;" class="me-1">● ωx</span><span style="color:#10b981;" class="me-1">● ωy</span><span style="color:#38bdf8;">● ωz (deg/s)</span>';
-        if (aLegend) aLegend.innerHTML = '<span class="text-info fw-semibold me-1">Cam 0 (Left):</span><span style="color:#f43f5e;" class="me-1">● Ax</span><span style="color:#10b981;" class="me-1">● Ay</span><span style="color:#38bdf8;">● Az-1g (g)</span>';
+        if (gLegend) gLegend.innerHTML = '<span class="text-info fw-semibold me-1">Cam 0 (Left):</span><span style="color:#f43f5e;" class="me-1">● X (Roll)</span><span style="color:#10b981;" class="me-1">● Y (Pitch)</span><span style="color:#38bdf8;">● Z (Yaw)</span>';
+        if (aLegend) aLegend.innerHTML = '<span class="text-info fw-semibold me-1">Cam 0 (Left):</span><span style="color:#f43f5e;" class="me-1">● X (Surge)</span><span style="color:#10b981;" class="me-1">● Y (Sway)</span><span style="color:#38bdf8;">● Z (Heave-1g)</span>';
       } else if (mode === 'cam1') {
-        if (gLegend) gLegend.innerHTML = '<span style="color:#c084fc;" class="fw-semibold me-1">Cam 1 (Right):</span><span style="color:#fb7185;" class="me-1">● ωx</span><span style="color:#34d399;" class="me-1">● ωy</span><span style="color:#7dd3fc;">● ωz (deg/s)</span>';
-        if (aLegend) aLegend.innerHTML = '<span style="color:#c084fc;" class="fw-semibold me-1">Cam 1 (Right):</span><span style="color:#fb7185;" class="me-1">● Ax</span><span style="color:#34d399;" class="me-1">● Ay</span><span style="color:#7dd3fc;">● Az-1g (g)</span>';
+        if (gLegend) gLegend.innerHTML = '<span style="color:#c084fc;" class="fw-semibold me-1">Cam 1 (Right):</span><span style="color:#fb7185;" class="me-1">● X (Roll)</span><span style="color:#34d399;" class="me-1">● Y (Pitch)</span><span style="color:#7dd3fc;">● Z (Yaw)</span>';
+        if (aLegend) aLegend.innerHTML = '<span style="color:#c084fc;" class="fw-semibold me-1">Cam 1 (Right):</span><span style="color:#fb7185;" class="me-1">● X (Surge)</span><span style="color:#34d399;" class="me-1">● Y (Sway)</span><span style="color:#7dd3fc;">● Z (Heave-1g)</span>';
       } else if (mode === 'diff') {
-        if (gLegend) gLegend.innerHTML = '<span class="text-warning fw-semibold me-1">Stereo Δ (C1-C0):</span><span style="color:#f43f5e;" class="me-1">● Δωx</span><span style="color:#10b981;" class="me-1">● Δωy</span><span style="color:#38bdf8;">● Δωz (deg/s)</span>';
-        if (aLegend) aLegend.innerHTML = '<span class="text-warning fw-semibold me-1">Stereo Δ (C1-C0):</span><span style="color:#f43f5e;" class="me-1">● ΔAx</span><span style="color:#10b981;" class="me-1">● ΔAy</span><span style="color:#38bdf8;">● ΔAz (g)</span>';
+        if (gLegend) gLegend.innerHTML = '<span class="text-warning fw-semibold me-1">Stereo Δ (C1-C0):</span><span style="color:#f43f5e;" class="me-1">● ΔX (Roll)</span><span style="color:#10b981;" class="me-1">● ΔY (Pitch)</span><span style="color:#38bdf8;">● ΔZ (Yaw)</span>';
+        if (aLegend) aLegend.innerHTML = '<span class="text-warning fw-semibold me-1">Stereo Δ (C1-C0):</span><span style="color:#f43f5e;" class="me-1">● ΔX (Surge)</span><span style="color:#10b981;" class="me-1">● ΔY (Sway)</span><span style="color:#38bdf8;">● ΔZ (Heave)</span>';
       }
 
       drawImuMotionCanvas(currentFrame);
@@ -3062,7 +3116,7 @@
             if (badge) {
               let srcLabel = '200 Hz Dual GPMF';
               if (data.source && data.source.includes('Binocular Stereo')) {
-                srcLabel = data.audio_sync && data.audio_sync.enabled ? 'Dual GPMF (Acoustic Sync)' : 'Dual Cam GPMF';
+                srcLabel = data.audio_sync && data.audio_sync.enabled ? 'Dual GPMF (Shutter Sync)' : 'Dual Cam GPMF';
               } else if (data.source && data.source.includes('OneDrive')) {
                 srcLabel = 'Pure .MP4 GPMF';
               } else if (data.source && data.source.includes('Local MP4')) {
@@ -3133,6 +3187,7 @@
       const lbl = document.getElementById('imuAudioSyncLabel');
       const modalCheck = document.getElementById('enableAudioSync');
       const tag = document.getElementById('imuDiffSyncTag');
+      const cam1SyncPill = document.getElementById('imuCam1SyncPill');
 
       if (wrap) {
         wrap.style.display = isStereo ? 'flex' : 'none';
@@ -3142,29 +3197,41 @@
       if (check) check.checked = isEnabled;
       if (modalCheck) modalCheck.checked = isEnabled;
 
+      const offsetMs = syncInfo && syncInfo.offset_ms !== undefined ? syncInfo.offset_ms : 23600.0;
+      const sign = offsetMs >= 0 ? '+' : '';
+      const offsetDisplay = Math.abs(offsetMs) >= 1000 ? `${sign}${(offsetMs / 1000.0).toFixed(1)}s` : `${sign}${offsetMs.toFixed(1)}ms`;
+
+      if (cam1SyncPill) {
+        if (isEnabled) {
+          cam1SyncPill.textContent = `t ${offsetDisplay}`;
+          cam1SyncPill.title = `Physical shutter & motion sync: Cam 1 evaluated at t_cam0 ${offsetDisplay}`;
+        } else {
+          cam1SyncPill.textContent = 't + 0.0s (Raw)';
+          cam1SyncPill.title = 'Cam 1 evaluated at unshifted nominal timestamp (0s)';
+        }
+      }
+
       if (lbl) {
         if (isEnabled) {
-          const offsetMs = syncInfo && syncInfo.offset_ms !== undefined ? syncInfo.offset_ms : 33.3;
-          const sign = offsetMs >= 0 ? '+' : '';
           lbl.style.color = '#38bdf8';
-          lbl.innerHTML = `<i class="fa-solid fa-microphone-lines text-warning me-1"></i> Audio Sync: <b>ON</b> (${sign}${offsetMs.toFixed(1)}ms)`;
-          lbl.title = `Sub-millisecond acoustic cross-correlation: ${sign}${offsetMs.toFixed(2)} ms temporal shift applied to Cam 1`;
+          lbl.innerHTML = `<i class="fa-solid fa-bolt text-warning me-1"></i> Sync: <b>ON</b> (${offsetDisplay})`;
+          lbl.title = `Physical motion & shutter cross-correlation: ${offsetDisplay} temporal shift applied to Cam 1`;
         } else {
           lbl.style.color = '#94a3b8';
-          lbl.innerHTML = `<i class="fa-solid fa-microphone-slash me-1"></i> Audio Sync: <b>OFF</b> (0ms)`;
-          lbl.title = `Raw unshifted video frame alignment (no acoustic correction)`;
+          lbl.innerHTML = `<i class="fa-solid fa-power-off me-1"></i> Sync: <b>OFF</b> (0s)`;
+          lbl.title = `Raw unshifted video frame alignment (no shutter correction)`;
         }
       }
 
       if (tag) {
         if (isEnabled) {
-          tag.className = 'badge bg-success-subtle text-success border border-success-subtle font-monospace ms-1';
-          tag.textContent = 'Acoustically Aligned';
-          tag.title = 'Cam 1 time-shifted by acoustic cross-correlation lag';
+          tag.className = 'badge bg-success-subtle text-success border border-success-subtle font-monospace';
+          tag.textContent = `Shutter Aligned (${offsetDisplay})`;
+          tag.title = `Cam 1 time-shifted by physical shutter cross-correlation offset (${offsetDisplay})`;
         } else {
-          tag.className = 'badge bg-secondary-subtle text-secondary border border-secondary font-monospace ms-1';
-          tag.textContent = 'Nominal Frame Clocks';
-          tag.title = 'Cam 1 evaluated at nominal unshifted frame timestamp (0 ms)';
+          tag.className = 'badge bg-secondary-subtle text-secondary border border-secondary font-monospace';
+          tag.textContent = 'Nominal Frame Clocks (0s)';
+          tag.title = 'Cam 1 evaluated at nominal unshifted frame timestamp (0 s)';
         }
       }
     }
@@ -3366,6 +3433,24 @@
       if (diffGEl) diffGEl.innerText = `${(diffG.mag || 0).toFixed(2)}°/s`;
       const diffAEl = document.getElementById('imuDiffAccelMag');
       if (diffAEl) diffAEl.innerText = `${(diffA.mag || 0).toFixed(3)} g`;
+      const diffYEl = document.getElementById('imuDiffYawVal');
+      if (diffYEl) {
+        const dgzVal = (diffG.z !== undefined ? diffG.z : (c1_gz - c0_gz));
+        diffYEl.innerText = `${dgzVal >= 0 ? '+' : ''}${dgzVal.toFixed(2)}°/s`;
+      }
+
+      // Handle visibility of Cam 1 card and baseline diff strip when single camera feed is active vs stereo
+      const isStereo = Boolean(f.stereo_mode || (f.cam0 && f.cam1 && f.cam0.feed !== f.cam1.feed));
+      const c1Card = document.getElementById('imuCam1Card');
+      const diffStrip = document.getElementById('imuBaselineDiffStrip');
+      if (c1Card) c1Card.style.display = isStereo ? 'block' : 'none';
+      if (diffStrip) diffStrip.style.display = isStereo ? 'block' : 'none';
+      const c0Title = document.getElementById('imuCam0Title');
+      if (c0Title) {
+        c0Title.innerHTML = isStereo
+          ? '<i class="fa-solid fa-camera me-1"></i> Cam 0 (Left - Top)'
+          : `<i class="fa-solid fa-camera me-1"></i> ${c0.feed ? c0.feed.replace('.MP4','') : 'Camera IMU'}`;
+      }
 
       // Legacy/backward-compatible single-cam DOM elements
       const gxEl = document.getElementById('imuGyroX');

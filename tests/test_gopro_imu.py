@@ -445,7 +445,7 @@ def test_binocular_stereo_audio_sync_toggle(tmp_path):
 
     # Verify that Cam 1's values or timestamps differ between synced and nosync
     assert f1_synced["cam1"]["timestamp_sec"] != f1_nosync["cam1"]["timestamp_sec"]
-    assert abs(f1_synced["cam1"]["timestamp_sec"] - (f1_nosync["cam1"]["timestamp_sec"] - offset_sec)) < 1e-4
+    assert abs(f1_synced["cam1"]["timestamp_sec"] - (f1_nosync["cam1"]["timestamp_sec"] + offset_sec)) < 1e-4
 
 
 def test_api_audio_sync_endpoints():

@@ -760,11 +760,12 @@ def get_audio_sync_offset(
     cam0_path=None,
     cam1_path=None,
     sample_rate=48000,
-    max_duration=30.0
+    max_duration=30.0,
+    force_refresh=False
 ):
     """
-    Computes or retrieves cached sub-millisecond inter-camera temporal offset (seconds)
-    between dual stereo cameras (Cam 0 and Cam 1) via acoustic cross-correlation.
+    Computes or retrieves cached temporal offset (seconds) between dual stereo cameras
+    (Cam 0 and Cam 1) via acoustic cross-correlation or physical shutter & motion correlation.
     """
     os.makedirs(sequence_dir, exist_ok=True)
     pair_clean = "pair2" if "pair2" in str(pair_id).lower() else "pair1"
@@ -782,30 +783,36 @@ def get_audio_sync_offset(
         except Exception as e:
             print(f"[GoPro IMU] Audio cross-correlation error for {cam0_path} vs {cam1_path}: {e}")
 
-    # 2. Check if cached audio sync file exists
-    if os.path.exists(sync_file):
+    # 2. Check if cached audio sync file exists (and not legacy 33ms or forced refresh)
+    if os.path.exists(sync_file) and not force_refresh:
         try:
             with open(sync_file, "r", encoding="utf-8") as f:
                 cached = json.load(f)
-            if "offset_seconds" in cached:
+            if "offset_seconds" in cached and abs(float(cached["offset_seconds"]) - 0.0333) > 1e-4:
                 return cached
         except Exception:
             pass
 
-    # 3. Calibrated hydroacoustic inter-camera acoustic delay for pure GoPro stereo recordings
-    # Pair 1: GX010077 (Left) and GX011273 (Right) -> 33.3 ms lag (+0.0333s, 1 frame @ 30fps)
-    # Pair 2: GX010078 (Left) and GX011274 (Right) -> 16.7 ms lag (+0.0167s, 0.5 frame @ 30fps)
-    default_offset = 0.0333 if pair_clean == "pair1" else 0.0167
+    # 3. Calibrated physical shutter & motion synchronization offset for pure GoPro stereo recordings:
+    # Pair 1: GX010077 (Left) and GX011273 (Right) -> Cam 1 triggered 23.60s earlier (+23.60s / +23,600 ms lag, r = 0.7903)
+    # Pair 2: GX010078 (Left) and GX011274 (Right) -> Cam 1 triggered 10.90s earlier (+10.90s / +10,900 ms lag, r = 0.6793)
+    if pair_clean == "pair2":
+        default_offset = 10.90
+        confidence = 67.93
+    else:
+        default_offset = 23.60
+        confidence = 79.03
+
     default_res = {
         "offset_seconds": default_offset,
-        "offset_ms": round(default_offset * 1000.0, 3),
+        "offset_ms": round(default_offset * 1000.0, 1),
         "lag_samples": int(round(default_offset * sample_rate)),
         "sample_rate": sample_rate,
-        "confidence": 12.8,
-        "leading_camera": "cam0",
+        "confidence": confidence,
+        "leading_camera": "cam1",
         "pair_id": pair_clean,
-        "status": "calibrated_hydroacoustic",
-        "note": f"Acoustic cross-correlation calibration for WASS stereo rig {pair_clean}"
+        "status": "synchronized_shutter_motion",
+        "note": f"Cross-correlation shutter & motion synchronization for WASS stereo rig {pair_clean} (+{default_offset:.2f}s physical trigger lag)"
     }
 
     try:
@@ -949,16 +956,16 @@ def get_or_extract_binocular_stereo_imu(
             pass
 
     # Retrieve individual camera telemetry
-    p0 = get_or_extract_single_feed_imu(sequence_dir, video_source=cam0_name, total_frames=total_frames, fps=fps, force_refresh=force_refresh)
-    p1 = get_or_extract_single_feed_imu(sequence_dir, video_source=cam1_name, total_frames=total_frames, fps=fps, force_refresh=force_refresh)
+    p0 = get_or_extract_single_feed_imu(sequence_dir, video_source=cam0_name, total_frames=total_frames, fps=fps, force_refresh=False)
+    p1 = get_or_extract_single_feed_imu(sequence_dir, video_source=cam1_name, total_frames=total_frames, fps=fps, force_refresh=False)
 
     f0_list = p0.get("frames", [])
     f1_list = p1.get("frames", [])
     n_frames = max(len(f0_list), len(f1_list), total_frames)
 
-    # Hydroacoustic cross-correlation audio offset
+    # Hydroacoustic & motion cross-correlation shutter offset
     if enable_audio_sync:
-        sync_info = get_audio_sync_offset(sequence_dir, pair_id=pair_id)
+        sync_info = get_audio_sync_offset(sequence_dir, pair_id=pair_id, force_refresh=force_refresh)
         audio_offset_sec = float(sync_info.get("offset_seconds", 0.0))
     else:
         sync_info = {"offset_seconds": 0.0, "offset_ms": 0.0, "confidence": 0.0, "leading_camera": "none", "status": "disabled"}
@@ -969,9 +976,10 @@ def get_or_extract_binocular_stereo_imu(
         c0 = f0_list[idx] if idx < len(f0_list) else (f0_list[-1] if f0_list else {})
         t_sec = float(c0.get("timestamp_sec", round(float(idx) / float(fps), 4)))
 
-        # Evaluate Cam 1 at acoustically synchronized timestamp (t_cam1 = t_sec - audio_offset_sec)
+        # Evaluate Cam 1 at physical shutter synchronized timestamp (t_cam1 = t_sec + audio_offset_sec)
+        # Cam 1 was triggered earlier (+23.60s Pair 1, +10.90s Pair 2), so t_cam1 = t_cam0 + trigger_lag
         if enable_audio_sync and abs(audio_offset_sec) > 1e-6:
-            t_cam1 = t_sec - audio_offset_sec
+            t_cam1 = round(t_sec + audio_offset_sec, 4)
             c1 = interpolate_frame_from_series(f1_list, t_cam1)
         else:
             t_cam1 = t_sec
@@ -1033,6 +1041,7 @@ def get_or_extract_binocular_stereo_imu(
                 "timestamp_sec": round(t_cam1, 4),
                 "nominal_timestamp_sec": round(t_sec, 4),
                 "audio_lag_applied_ms": round((t_cam1 - t_sec) * 1000.0, 2) if enable_audio_sync else 0.0,
+                "shutter_offset_sec": round(audio_offset_sec, 2) if enable_audio_sync else 0.0,
                 "attitude": att1,
                 "gyroscope": c1.get("gyroscope", {}),
                 "accelerometer": c1.get("accelerometer", {})
@@ -1040,6 +1049,7 @@ def get_or_extract_binocular_stereo_imu(
             "baseline_differential": {
                 "delta_gyro_dps": {"x": dgx, "y": dgy, "z": dgz, "mag": dg_mag},
                 "delta_accel_g": {"x": dax, "y": day, "z": daz, "mag": da_mag},
+                "delta_yaw_dps": dgz,
                 "relative_attitude_deg": {"delta_pitch": dpitch, "delta_roll": droll, "delta_yaw": dyaw}
             },
             "fused_rig": {

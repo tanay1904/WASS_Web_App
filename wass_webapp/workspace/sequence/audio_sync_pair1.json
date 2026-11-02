@@ -1,11 +1,11 @@
 {
-  "offset_seconds": 0.0333,
-  "offset_ms": 33.3,
-  "lag_samples": 1598,
+  "offset_seconds": 23.6,
+  "offset_ms": 23600.0,
+  "lag_samples": 1132800,
   "sample_rate": 48000,
-  "confidence": 12.8,
-  "leading_camera": "cam0",
+  "confidence": 79.03,
+  "leading_camera": "cam1",
   "pair_id": "pair1",
-  "status": "calibrated_hydroacoustic",
-  "note": "Acoustic cross-correlation calibration for WASS stereo rig pair1"
+  "status": "synchronized_shutter_motion",
+  "note": "Cross-correlation shutter & motion synchronization for WASS stereo rig pair1 (+23.60s physical trigger lag)"
 }

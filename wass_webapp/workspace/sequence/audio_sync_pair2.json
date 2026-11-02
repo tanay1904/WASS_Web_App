@@ -1,0 +1,11 @@
+{
+  "offset_seconds": 10.9,
+  "offset_ms": 10900.0,
+  "lag_samples": 523200,
+  "sample_rate": 48000,
+  "confidence": 67.93,
+  "leading_camera": "cam1",
+  "pair_id": "pair2",
+  "status": "synchronized_shutter_motion",
+  "note": "Cross-correlation shutter & motion synchronization for WASS stereo rig pair2 (+10.90s physical trigger lag)"
+}
