@@ -37,7 +37,7 @@ import asyncio
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 import urllib.parse
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -1697,9 +1697,10 @@ def export_circumference_csv(target: str):
 
 
 @app.get("/api/telemetry/imu")
-def get_imu_telemetry():
+def get_imu_telemetry(feed: str = Query(None), force: bool = Query(False)):
     """
-    Returns the GoPro IMU motion telemetry sequence for the active workspace.
+    Returns the GoPro IMU motion telemetry sequence for any camera feed.
+    Query parameter 'feed' can specify any camera video file (e.g. GX010077.MP4, GX011273.MP4, GX010078.MP4, GX011274.MP4, cam0, cam1).
     Synchronized with video frame timestamps.
     """
     try:
@@ -1707,20 +1708,88 @@ def get_imu_telemetry():
         seq_dir = os.path.join(WORK_DIR, "sequence")
         total_frames = 150
         meta_file = os.path.join(seq_dir, "sequence_meta.json")
-        fps = 30.0
+        fps = 10.0
         if os.path.exists(meta_file):
             try:
                 with open(meta_file, "r") as mf:
                     m = json.load(mf)
                     total_frames = int(m.get("total_frames", 150))
-                    fps = float(m.get("fps", 30.0))
+                    fps = float(m.get("fps", 10.0))
             except Exception:
                 pass
-        
-        telemetry = get_or_extract_sequence_imu(seq_dir, total_frames=total_frames, fps=fps)
+
+        feed_to_use = feed or pipeline_state.get("active_imu_feed", "GX010077.MP4")
+        telemetry = get_or_extract_sequence_imu(
+            seq_dir,
+            total_frames=total_frames,
+            fps=fps,
+            video_source=feed_to_use,
+            force_refresh=force
+        )
         return JSONResponse(telemetry)
     except Exception as e:
         return JSONResponse({"error": f"Failed to retrieve IMU telemetry: {str(e)}"}, status_code=500)
+
+
+@app.get("/api/telemetry/imu/feeds")
+def get_available_imu_feeds():
+    """
+    Returns the catalog of all available camera feeds (OneDrive 4K feeds and uploaded videos).
+    """
+    try:
+        from wass_webapp.gopro_imu import list_available_gopro_feeds
+        feeds = list_available_gopro_feeds(uploads_dir=UPLOAD_DIR)
+        active_feed = pipeline_state.get("active_imu_feed", "GX010077.MP4")
+        for f in feeds:
+            f["is_active"] = (f["id"].lower() == active_feed.lower())
+        return JSONResponse({
+            "active_feed": active_feed,
+            "available_feeds": feeds
+        })
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to list camera feeds: {str(e)}"}, status_code=500)
+
+
+@app.post("/api/telemetry/imu/select_feed")
+async def select_active_imu_feed(request: Request):
+    """
+    Switches active sequence IMU telemetry to any specified camera feed.
+    Body: {"feed": "GX011273.MP4"} or form data.
+    """
+    try:
+        data = {}
+        if request.headers.get("content-type", "").startswith("application/json"):
+            data = await request.json()
+        else:
+            form = await request.form()
+            data = dict(form)
+
+        feed_id = data.get("feed") or data.get("feed_id") or "GX010077.MP4"
+        seq_dir = os.path.join(WORK_DIR, "sequence")
+
+        total_frames = 150
+        fps = 10.0
+        meta_file = os.path.join(seq_dir, "sequence_meta.json")
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, "r") as mf:
+                    m = json.load(mf)
+                    total_frames = int(m.get("total_frames", 150))
+                    fps = float(m.get("fps", 10.0))
+            except Exception:
+                pass
+
+        from wass_webapp.gopro_imu import switch_sequence_imu_feed
+        payload = switch_sequence_imu_feed(seq_dir, video_source=feed_id, total_frames=total_frames, fps=fps)
+        pipeline_state["active_imu_feed"] = feed_id
+
+        return JSONResponse({
+            "status": "success",
+            "active_feed": feed_id,
+            "telemetry": payload
+        })
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to switch IMU feed: {str(e)}"}, status_code=500)
 
 
 @app.get("/api/telemetry/imu/export_all_csv")

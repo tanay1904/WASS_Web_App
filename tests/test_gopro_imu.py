@@ -207,3 +207,37 @@ def test_pure_mp4_telemetry_source():
     assert "x_dps" in f0["gyroscope"]
     assert "z_g" in f0["accelerometer"]
 
+
+def test_list_available_gopro_feeds():
+    """Verify listing all available camera feeds (Pair 1 & Pair 2 Cam0 and Cam1)."""
+    from wass_webapp.gopro_imu import list_available_gopro_feeds
+    feeds = list_available_gopro_feeds()
+    assert len(feeds) >= 4
+    feed_ids = [f["id"] for f in feeds]
+    assert "GX010077.MP4" in feed_ids
+    assert "GX011273.MP4" in feed_ids
+    assert "GX010078.MP4" in feed_ids
+    assert "GX011274.MP4" in feed_ids
+
+
+def test_api_feeds_endpoint():
+    """Verify GET /api/telemetry/imu/feeds returns catalog of feeds with active marker."""
+    resp = client.get("/api/telemetry/imu/feeds")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "active_feed" in data
+    assert "available_feeds" in data
+    assert len(data["available_feeds"]) >= 4
+    assert any(f["is_active"] for f in data["available_feeds"])
+
+
+def test_api_multi_camera_feed_query():
+    """Verify GET /api/telemetry/imu?feed=GX011273.MP4 returns telemetry for Cam 1."""
+    resp = client.get("/api/telemetry/imu?feed=GX011273.MP4")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["feed_name"] == "GX011273.MP4"
+    assert "GoPro HERO GPMF" in data["source"]
+    assert len(data.get("frames", [])) > 0
+
+

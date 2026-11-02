@@ -593,11 +593,19 @@
               <!-- GoPro Raw IMU Telemetry (vguzov/gopro_imu_extractor) -->
               <div class="flex-shrink-0 p-2 rounded" style="background-color: var(--bg-surface-elevated); border: 1px solid var(--border-subtle);" id="goproImuCard">
                 <div class="d-flex justify-content-between align-items-center mb-1">
-                  <span class="stat-label mb-0">
-                    <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU: Gyro & Acceleration
-                  </span>
-                  <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;">
-                    <i class="fa-solid fa-circle-check me-1"></i> 200 Hz GPMF
+                  <div class="d-flex align-items-center gap-1">
+                    <span class="stat-label mb-0">
+                      <i class="fa-solid fa-microchip text-info me-1"></i> GoPro IMU:
+                    </span>
+                    <select class="form-select form-select-sm py-0 px-1 font-monospace" id="imuFeedSelector" style="font-size: 0.65rem; height: 21px; width: auto; background-color: var(--bg-surface); border-color: var(--border-subtle); color: var(--text-primary); cursor: pointer;" onchange="switchCameraImuFeed(this.value)" title="Select physical GoPro camera sensor feed">
+                      <option value="GX010077.MP4" selected>Cam 0 (Pair 1 Left)</option>
+                      <option value="GX011273.MP4">Cam 1 (Pair 1 Right)</option>
+                      <option value="GX010078.MP4">Cam 0 (Pair 2 Left)</option>
+                      <option value="GX011274.MP4">Cam 1 (Pair 2 Right)</option>
+                    </select>
+                  </div>
+                  <span class="pill-badge text-success" id="imuBadgeSource" style="font-size: 0.65rem;" title="Genuine 200 Hz GPMF Physical Sensor Telemetry">
+                    <i class="fa-solid fa-circle-check me-1"></i> Pure .MP4 GPMF
                   </span>
                 </div>
 
@@ -2944,21 +2952,38 @@
       drawImuMotionCanvas(currentFrame);
     }
 
-    async function loadImuTelemetry() {
+    async function loadImuTelemetry(feedName = null) {
       if (isFetchingImu) return;
       isFetchingImu = true;
       try {
-        const res = await fetch('/api/telemetry/imu?t=' + Date.now());
+        let url = '/api/telemetry/imu?t=' + Date.now();
+        if (feedName) {
+          url += '&feed=' + encodeURIComponent(feedName);
+        }
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data.frames)) {
             imuSequenceData = data.frames;
             imuTelemetryLoaded = true;
+
+            const feedSelector = document.getElementById('imuFeedSelector');
+            if (feedSelector && data.feed_name) {
+              for (let opt of feedSelector.options) {
+                if (opt.value.toLowerCase() === data.feed_name.toLowerCase()) {
+                  feedSelector.value = opt.value;
+                  break;
+                }
+              }
+            }
+
             const badge = document.getElementById('imuBadgeSource');
             if (badge) {
               let srcLabel = '200 Hz DMP';
               if (data.source && data.source.includes('OneDrive')) {
                 srcLabel = 'Pure .MP4 GPMF';
+              } else if (data.source && data.source.includes('Local MP4')) {
+                srcLabel = 'Local .MP4 GPMF';
               } else if (data.source && data.source.includes('goimuex')) {
                 srcLabel = 'GPMF goimuex';
               } else if (data.source && data.source.includes('GPMF')) {
@@ -2983,6 +3008,46 @@
       }
       generateFallbackImuTelemetry(Math.max(totalFrames || 150, currentFrame + 1));
       updateImuDashboard(currentFrame);
+    }
+
+    async function switchCameraImuFeed(feedName) {
+      if (!feedName) return;
+      try {
+        const badge = document.getElementById('imuBadgeSource');
+        if (badge) {
+          badge.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i> Loading Feed...`;
+        }
+        await fetch('/api/telemetry/imu/select_feed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feed: feedName })
+        });
+      } catch (e) {
+        console.warn('[IMU] Feed switch request note:', e);
+      }
+      await loadImuTelemetry(feedName);
+    }
+
+    async function populateAvailableImuFeeds() {
+      try {
+        const res = await fetch('/api/telemetry/imu/feeds');
+        if (res.ok) {
+          const data = await res.json();
+          const sel = document.getElementById('imuFeedSelector');
+          if (sel && Array.isArray(data.available_feeds) && data.available_feeds.length > 0) {
+            sel.innerHTML = '';
+            for (const f of data.available_feeds) {
+              const opt = document.createElement('option');
+              opt.value = f.id;
+              opt.textContent = f.name;
+              if (f.is_active) opt.selected = true;
+              sel.appendChild(opt);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[IMU] Feeds listing note:', e);
+      }
     }
 
     function extendImuSequenceUpTo(targetCount) {
@@ -3316,6 +3381,7 @@
     }
 
     loadMeta().then(async () => {
+      populateAvailableImuFeeds();
       await loadImuTelemetry();
       const urlParams = new URLSearchParams(window.location.search);
       const frameParam = urlParams.get('frame');
