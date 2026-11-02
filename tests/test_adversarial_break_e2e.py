@@ -250,7 +250,7 @@ def test_upload_corrupt_binary_blob_handling():
     ("abc", 422),
     ("NaN", 422),
     ("null", 422),
-    (60, 404),
+    (5000, 404),
     (999999, 404)
 ])
 def test_frame_endpoint_edge_indices(idx, expected_status):

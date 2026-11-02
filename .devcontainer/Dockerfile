@@ -19,6 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblapack-dev \
     libblas-dev \
     f2c \
+    nodejs \
+    npm \
+    gpac \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -42,3 +45,9 @@ RUN git clone --depth 1 https://github.com/fbergama/wass.git /opt/wass_source \
     && cmake --build build -j$(nproc) \
     && cmake --install build \
     && rm -rf /opt/wass_source/build
+
+# 4. Install GoPro IMU Extractor (vguzov/gopro_imu_extractor)
+RUN git clone --depth 1 https://github.com/vguzov/gopro_imu_extractor.git /opt/gopro_imu_extractor \
+    && cd /opt/gopro_imu_extractor \
+    && npm install \
+    && npm install -g .

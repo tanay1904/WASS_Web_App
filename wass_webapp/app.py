@@ -701,6 +701,12 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, recon
         with open(os.path.join(seq_dir, "sequence_meta.json"), "w") as fm:
             json.dump(meta, fm, indent=2)
 
+        try:
+            from wass_webapp.gopro_imu import get_or_extract_sequence_imu
+            get_or_extract_sequence_imu(seq_dir, total_frames=rendered_count, fps=10.0, video_path=custom_cam0 or None)
+        except Exception as ie:
+            log(f"[GoPro IMU Note] Telemetry sync: {ie}")
+
         invalidate_caches()
 
         with pipeline_lock:
@@ -865,6 +871,12 @@ def run_pipeline_worker(video0, video1, video_sbs, max_frames=100000, step=1, us
         from wass_webapp.wass_video_pipeline import format_wass_workspaces_to_sequence
         rendered_count = format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=enable_circular_buffer)
         log(f"  -> Successfully formatted {rendered_count} native WASS frames into 3D point clouds and telemetry.")
+
+        try:
+            from wass_webapp.gopro_imu import get_or_extract_sequence_imu
+            get_or_extract_sequence_imu(seq_dir, total_frames=rendered_count, fps=10.0, video_path=video0 or video_sbs or None)
+        except Exception as ie:
+            log(f"[GoPro IMU Note] Telemetry sync: {ie}")
 
         invalidate_caches()
         with pipeline_lock:
@@ -1633,6 +1645,67 @@ def export_circumference_csv(target: str):
         return JSONResponse({"error": "Circumference points not found for " + target}, status_code=404)
 
     return JSONResponse({"error": "Circumference points only available for sequence frames"}, status_code=400)
+
+
+@app.get("/api/telemetry/imu")
+def get_imu_telemetry():
+    """
+    Returns the GoPro IMU motion telemetry sequence for the active workspace.
+    Synchronized with video frame timestamps.
+    """
+    try:
+        from wass_webapp.gopro_imu import get_or_extract_sequence_imu
+        seq_dir = os.path.join(WORK_DIR, "sequence")
+        total_frames = 150
+        meta_file = os.path.join(seq_dir, "sequence_meta.json")
+        fps = 30.0
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, "r") as mf:
+                    m = json.load(mf)
+                    total_frames = int(m.get("total_frames", 150))
+                    fps = float(m.get("fps", 30.0))
+            except Exception:
+                pass
+        
+        telemetry = get_or_extract_sequence_imu(seq_dir, total_frames=total_frames, fps=fps)
+        return JSONResponse(telemetry)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to retrieve IMU telemetry: {str(e)}"}, status_code=500)
+
+
+@app.get("/api/telemetry/imu/{frame_idx}")
+def get_frame_imu(frame_idx: int):
+    """
+    Returns instantaneous GoPro IMU telemetry (Pitch, Roll, Yaw, Gyro rates, Accel G-forces)
+    for a specific video frame index.
+    """
+    if frame_idx < 0:
+        return JSONResponse({"error": "frame_idx must be >= 0"}, status_code=400)
+    try:
+        from wass_webapp.gopro_imu import get_or_extract_sequence_imu
+        seq_dir = os.path.join(WORK_DIR, "sequence")
+        meta_file = os.path.join(seq_dir, "sequence_meta.json")
+        fps = 30.0
+        total_frames = max(150, frame_idx + 1)
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, "r") as mf:
+                    m = json.load(mf)
+                    total_frames = max(int(m.get("total_frames", 150)), frame_idx + 1)
+                    fps = float(m.get("fps", 30.0))
+            except Exception:
+                pass
+
+        telemetry = get_or_extract_sequence_imu(seq_dir, total_frames=total_frames, fps=fps)
+        frames = telemetry.get("frames", [])
+        if 0 <= frame_idx < len(frames):
+            return JSONResponse(frames[frame_idx])
+        elif frames:
+            return JSONResponse(frames[min(frame_idx, len(frames) - 1)])
+        return JSONResponse({"error": f"Frame {frame_idx} IMU data not found"}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to retrieve IMU frame data: {str(e)}"}, status_code=500)
 
 
 def main():

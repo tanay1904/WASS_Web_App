@@ -51,9 +51,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PORT=8080 \
     HOST=0.0.0.0
 
-# Install runtime libraries required by OpenCV, Boost, and Lapack
+# Install runtime libraries required by OpenCV, Boost, Lapack, and GoPro IMU Extractor
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    git \
+    nodejs \
+    npm \
+    gpac \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
@@ -69,7 +73,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblapack3 \
     libblas3 \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && git clone --depth 1 https://github.com/vguzov/gopro_imu_extractor.git /opt/gopro_imu_extractor \
+    && cd /opt/gopro_imu_extractor \
+    && npm install \
+    && npm install -g .
 
 # Copy compiled native WASS C++ binaries from builder stage to /usr/local/bin
 COPY --from=wass-builder /opt/wass_dist/bin/* /usr/local/bin/
