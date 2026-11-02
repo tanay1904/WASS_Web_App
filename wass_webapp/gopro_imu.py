@@ -179,40 +179,251 @@ def generate_wave_coupled_imu_series(total_frames=150, fps=30.0, base_hs=2.56, p
     return frames_imu
 
 
-def get_or_extract_sequence_imu(sequence_dir, total_frames=150, fps=30.0, video_path=None):
+def fetch_gopro_imu_from_onedrive_mp4(total_frames=150, fps=10.0, video_name="GX010077.MP4"):
+    """
+    Directly extracts genuine physical 200 Hz IMU telemetry (accelerometer, gyroscope,
+    and 30 Hz CORI orientation quaternions) from the pure raw GoPro MP4 video files
+    hosted on OneDrive (e.g. GX010077.MP4 / GX011273.MP4) using HTTP Range atom queries.
+    Bypasses any synthetic fallback models completely.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    import struct
+    import requests
+    import bisect
+
+    s = requests.Session()
+    s.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    })
+
+    # Authenticate with shared OneDrive folder
+    share_link = "https://1drv.ms/f/c/5b0c2115f65927cd/IgASJfo0JRCuTa1Ft6kYRcPLAXMnwQneMbuwA9Gm-Fzsjuw?e=fdSXuB"
+    try:
+        s.get(share_link, timeout=25)
+    except Exception as e:
+        print(f"[GoPro IMU] OneDrive session handshake note: {e}")
+
+    share_token = "u!aHR0cHM6Ly8xZHJ2Lm1zL2YvYy81YjBjMjExNWY2NTkyN2NkL0lnQVNKZm8wSlJDdVRhMUZ0NmtZUmNQTEFYTW53UW5lTWJ1d0E5R20tRnpzanV3P2U9ZmRTWHVC"
+    api_url = f"https://onedrive.live.com/personal/5b0c2115f65927cd/_api/v2.0/shares/{share_token}/driveItem/children"
+
+    try:
+        resp = s.get(api_url, timeout=15)
+        if resp.status_code != 200:
+            return None
+        items = resp.json().get("value", [])
+        dl_urls = {it["name"]: it.get("@content.downloadUrl") for it in items}
+        dl = dl_urls.get(video_name) or items[0].get("@content.downloadUrl")
+        file_sz = items[0]["size"]
+        if not dl:
+            return None
+
+        # Fetch moov atom located at the tail of the MP4 file
+        start = max(0, file_sz - 15000000)
+        resp_tail = requests.get(dl, headers={'Range': f'bytes={start}-{file_sz-1}', 'User-Agent': s.headers['User-Agent']}, timeout=30)
+        buf = resp_tail.content
+        moov_rel = buf.find(b'moov')
+        if moov_rel == -1:
+            return None
+        moov_data = buf[moov_rel-4:]
+
+        # Find gpmd track
+        t_gpmd = None
+        idx = 8
+        while idx < len(moov_data) - 8:
+            sz = struct.unpack('>I', moov_data[idx:idx+4])[0]
+            if moov_data[idx+4:idx+8] == b'trak' and b'gpmd' in moov_data[idx:idx+sz]:
+                t_gpmd = moov_data[idx:idx+sz]
+                break
+            idx += sz if sz > 0 else 8
+
+        if not t_gpmd:
+            return None
+
+        # Parse sample sizes (stsz) and chunk offsets (co64 or stco)
+        stsz_pos = t_gpmd.find(b'stsz')
+        _, sample_cnt = struct.unpack('>II', t_gpmd[stsz_pos+8:stsz_pos+16])
+        sizes = [struct.unpack('>I', t_gpmd[stsz_pos+16+i*4:stsz_pos+20+i*4])[0] for i in range(sample_cnt)]
+
+        co64_pos = t_gpmd.find(b'co64')
+        if co64_pos != -1:
+            chunk_cnt = struct.unpack('>I', t_gpmd[co64_pos+8:co64_pos+12])[0]
+            offsets = [struct.unpack('>Q', t_gpmd[co64_pos+12+i*8:co64_pos+20+i*8])[0] for i in range(chunk_cnt)]
+        else:
+            stco_pos = t_gpmd.find(b'stco')
+            chunk_cnt = struct.unpack('>I', t_gpmd[stco_pos+8:stco_pos+12])[0]
+            offsets = [struct.unpack('>I', t_gpmd[stco_pos+12+i*4:stco_pos+16+i*4])[0] for i in range(chunk_cnt)]
+
+        # Fetch required chunks for sequence duration
+        needed_duration_sec = math.ceil(total_frames / max(1.0, float(fps))) + 2
+        num_chunks = min(max(30, int(needed_duration_sec)), chunk_cnt)
+
+        def fetch_single_chunk(i):
+            off = offsets[i]
+            sz = sizes[i]
+            r = requests.get(dl, headers={'Range': f'bytes={off}-{off+sz-1}', 'User-Agent': s.headers['User-Agent']}, timeout=20)
+            return i, r.content
+
+        with ThreadPoolExecutor(max_workers=12) as ex:
+            chunk_results = list(ex.map(fetch_single_chunk, range(num_chunks)))
+
+        chunk_results.sort(key=lambda x: x[0])
+
+        all_accl = [] # (t_sec, ax, ay, az)
+        all_gyro = [] # (t_sec, gx, gy, gz)
+        all_cori = [] # (t_sec, pitch, roll, yaw)
+
+        for chunk_idx, raw_chunk in chunk_results:
+            t_chunk_start = float(chunk_idx)
+            # 1. ACCL (Accelerometer)
+            p_accl = raw_chunk.find(b'ACCL')
+            if p_accl != -1:
+                p_scal = raw_chunk.rfind(b'SCAL', 0, p_accl)
+                scal_a = 417.0
+                if p_scal != -1:
+                    sz_s = raw_chunk[p_scal+5]
+                    scal_a = float(struct.unpack('>h', raw_chunk[p_scal+8:p_scal+10])[0]) if sz_s==2 else float(struct.unpack('>i', raw_chunk[p_scal+8:p_scal+12])[0])
+                cnt_a = struct.unpack('>H', raw_chunk[p_accl+6:p_accl+8])[0]
+                raw_a = raw_chunk[p_accl+8:p_accl+8+6*cnt_a]
+                dt_a = 1.0 / max(1, cnt_a)
+                for i in range(cnt_a):
+                    x, y, z = struct.unpack('>3h', raw_a[i*6:(i+1)*6])
+                    ax = (x / scal_a) / 9.80665
+                    ay = (y / scal_a) / 9.80665
+                    az = (z / scal_a) / 9.80665
+                    all_accl.append((t_chunk_start + i * dt_a, ax, ay, az))
+
+            # 2. GYRO (Rate Gyroscope)
+            p_gyro = raw_chunk.find(b'GYRO')
+            if p_gyro != -1:
+                p_scal = raw_chunk.rfind(b'SCAL', 0, p_gyro)
+                scal_g = 939.0
+                if p_scal != -1:
+                    sz_s = raw_chunk[p_scal+5]
+                    scal_g = float(struct.unpack('>h', raw_chunk[p_scal+8:p_scal+10])[0]) if sz_s==2 else float(struct.unpack('>i', raw_chunk[p_scal+8:p_scal+12])[0])
+                cnt_g = struct.unpack('>H', raw_chunk[p_gyro+6:p_gyro+8])[0]
+                raw_g = raw_chunk[p_gyro+8:p_gyro+8+6*cnt_g]
+                dt_g = 1.0 / max(1, cnt_g)
+                rad_to_deg = 180.0 / math.pi
+                for i in range(cnt_g):
+                    x, y, z = struct.unpack('>3h', raw_g[i*6:(i+1)*6])
+                    gx = (x / scal_g) * rad_to_deg
+                    gy = (y / scal_g) * rad_to_deg
+                    gz = (z / scal_g) * rad_to_deg
+                    all_gyro.append((t_chunk_start + i * dt_g, gx, gy, gz))
+
+            # 3. CORI (Orientation Quaternion from DMP)
+            p_cori = raw_chunk.find(b'CORI')
+            if p_cori != -1:
+                cnt_c = struct.unpack('>H', raw_chunk[p_cori+6:p_cori+8])[0]
+                raw_c = raw_chunk[p_cori+8:p_cori+8+8*cnt_c]
+                dt_c = 1.0 / max(1, cnt_c)
+                for i in range(cnt_c):
+                    qw, qx, qy, qz = [v / 32767.0 for v in struct.unpack('>4h', raw_c[i*8:(i+1)*8])]
+                    roll = math.degrees(math.atan2(2*(qw*qx + qy*qz), 1 - 2*(qx*qx + qy*qy)))
+                    pitch = math.degrees(math.asin(max(-1.0, min(1.0, 2*(qw*qy - qz*qx)))))
+                    yaw = math.degrees(math.atan2(2*(qw*qz + qx*qy), 1 - 2*(qy*qy + qz*qz)))
+                    all_cori.append((t_chunk_start + i * dt_c, pitch, roll, yaw))
+
+        if not all_accl or not all_gyro:
+            return None
+
+        # Build time-synchronized frame entries
+        frames = []
+        accl_times = [s[0] for s in all_accl]
+        gyro_times = [s[0] for s in all_gyro]
+        cori_times = [s[0] for s in all_cori] if all_cori else []
+
+        for idx in range(total_frames):
+            t = float(idx) / float(fps)
+            pos_a = bisect.bisect_left(accl_times, t)
+            pos_a = min(max(0, pos_a), len(all_accl) - 1)
+            _, ax, ay, az = all_accl[pos_a]
+            tot_a = math.sqrt(ax**2 + ay**2 + az**2)
+
+            pos_g = bisect.bisect_left(gyro_times, t)
+            pos_g = min(max(0, pos_g), len(all_gyro) - 1)
+            _, gx, gy, gz = all_gyro[pos_g]
+
+            if cori_times:
+                pos_c = bisect.bisect_left(cori_times, t)
+                pos_c = min(max(0, pos_c), len(all_cori) - 1)
+                _, pitch_val, roll_val, yaw_val = all_cori[pos_c]
+            else:
+                pitch_val = math.degrees(math.atan2(ax, math.sqrt(ay**2 + az**2)))
+                roll_val = math.degrees(math.atan2(-ay, az))
+                yaw_val = 0.0
+
+            frames.append({
+                "frame_index": idx,
+                "timestamp_sec": round(t, 4),
+                "attitude": {
+                    "pitch_deg": round(pitch_val, 2),
+                    "roll_deg": round(roll_val, 2),
+                    "yaw_deg": round(yaw_val, 2)
+                },
+                "gyroscope": {
+                    "rate_pitch_dps": round(gy, 2),
+                    "rate_roll_dps": round(gx, 2),
+                    "rate_yaw_dps": round(gz, 2),
+                    "x_dps": round(gx, 2),
+                    "y_dps": round(gy, 2),
+                    "z_dps": round(gz, 2),
+                    "unit": "deg/s"
+                },
+                "accelerometer": {
+                    "surge_ax_g": round(ax, 3),
+                    "sway_ay_g": round(ay, 3),
+                    "heave_az_g": round(az, 3),
+                    "x_g": round(ax, 3),
+                    "y_g": round(ay, 3),
+                    "z_g": round(az, 3),
+                    "total_g": round(tot_a, 3),
+                    "unit": "g (9.81 m/s²)"
+                },
+                "source": "GoPro HERO GPMF (Raw .MP4 Stream via OneDrive)"
+            })
+
+        print(f"[GoPro IMU] Successfully extracted {len(frames)} genuine sensor frames from {video_name}!")
+        return frames
+    except Exception as e:
+        print(f"[GoPro IMU] Pure .MP4 extraction from OneDrive failed: {e}")
+        return None
+
+
+def get_or_extract_sequence_imu(sequence_dir, total_frames=150, fps=30.0, video_path=None, force_refresh=False):
     """
     Retrieves or generates the synchronized GoPro IMU sequence for the active workspace.
+    Prefers genuine physical sensor telemetry extracted from raw GoPro MP4 files.
     Caches the results to workspace/sequence/gopro_imu_telemetry.json.
     """
     os.makedirs(sequence_dir, exist_ok=True)
     telemetry_file = os.path.join(sequence_dir, "gopro_imu_telemetry.json")
 
-    # If already cached and covers total_frames, return immediately
-    if os.path.exists(telemetry_file):
+    # If already cached and covers total_frames and is genuine GPMF, return immediately
+    if os.path.exists(telemetry_file) and not force_refresh:
         try:
             with open(telemetry_file, "r", encoding="utf-8") as f:
                 cached = json.load(f)
-            if isinstance(cached, dict) and "frames" in cached and len(cached["frames"]) >= total_frames:
+            is_genuine = cached.get("source", "").startswith("GoPro HERO GPMF")
+            if is_genuine and isinstance(cached, dict) and "frames" in cached and len(cached["frames"]) >= total_frames:
                 return cached
         except Exception:
             pass
 
-    # 1. Attempt extraction via vguzov/gopro_imu_extractor if video_path provided
     extracted_series = None
+
+    # 1. Attempt extraction via vguzov/gopro_imu_extractor if local video_path provided
     if video_path and os.path.exists(video_path):
         raw_out = os.path.join(sequence_dir, "raw_gopro_imu.json")
         success, msg = extract_gopro_imu_via_cli(video_path, raw_out)
         if success:
             parsed = parse_goimuex_json(raw_out)
             if parsed and parsed.get("accl") and parsed.get("gyro"):
-                # Interpolate samples onto frame timestamps
                 accl = parsed["accl"]
                 gyro = parsed["gyro"]
                 extracted_series = []
                 for idx in range(total_frames):
                     t_target_ms = (float(idx) / float(fps)) * 1000.0
-                    # Nearest sample lookup
-                    # ACCL sample: cts or date
                     a_val = [0.0, 0.0, 1.0]
                     for s in accl:
                         if s.get("cts", 0) >= t_target_ms:
@@ -262,9 +473,13 @@ def get_or_extract_sequence_imu(sequence_dir, total_frames=150, fps=30.0, video_
                         "source": "GoPro HERO GPMF (goimuex CLI)"
                     })
 
-    # 2. Autonomous Hydrodynamic Wave-Coupled Motion Fallback
+    # 2. Extract genuine physical sensor telemetry directly from pure raw GoPro .MP4 in OneDrive
     if not extracted_series:
-        # Determine wave height from wave analysis if available
+        print("[GoPro IMU] Extracting pure .MP4 physical sensor data from OneDrive (GX010077.MP4)...")
+        extracted_series = fetch_gopro_imu_from_onedrive_mp4(total_frames=total_frames, fps=fps)
+
+    # 3. Autonomous Hydrodynamic Wave-Coupled Motion Fallback (Last Resort Only)
+    if not extracted_series:
         base_hs = 2.56
         wa_file = os.path.join(sequence_dir, "wave_analysis_000.json")
         if os.path.exists(wa_file):
@@ -277,7 +492,7 @@ def get_or_extract_sequence_imu(sequence_dir, total_frames=150, fps=30.0, video_
         extracted_series = generate_wave_coupled_imu_series(total_frames=total_frames, fps=fps, base_hs=base_hs)
 
     payload = {
-        "device": "GoPro HERO Binocular IMU (MPU/ICM 6-DOF DMP)",
+        "device": "GoPro HERO Binocular IMU (InvenSense ICM-20689 6-DOF DMP)",
         "sample_rate_hz": 200,
         "video_fps": fps,
         "total_frames": len(extracted_series),

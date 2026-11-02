@@ -1,0 +1,2 @@
+frame_index,timestamp_sec,gyro_x_dps,gyro_y_dps,gyro_z_dps,gyro_mag_dps,accel_x_g,accel_y_g,accel_z_g,accel_mag_g
+12,1.2000,-0.12,2.56,-0.43,2.60,0.970,-0.178,0.452,1.085

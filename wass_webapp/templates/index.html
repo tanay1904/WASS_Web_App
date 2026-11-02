@@ -2956,8 +2956,16 @@
             imuTelemetryLoaded = true;
             const badge = document.getElementById('imuBadgeSource');
             if (badge) {
-              const isGpmf = data.source && (data.source.includes('goimuex') || data.source.includes('GPMF'));
-              badge.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> ${isGpmf ? 'GPMF goimuex' : '200 Hz DMP'}`;
+              let srcLabel = '200 Hz DMP';
+              if (data.source && data.source.includes('OneDrive')) {
+                srcLabel = 'Pure .MP4 GPMF';
+              } else if (data.source && data.source.includes('goimuex')) {
+                srcLabel = 'GPMF goimuex';
+              } else if (data.source && data.source.includes('GPMF')) {
+                srcLabel = '200 Hz GPMF';
+              }
+              badge.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> ${srcLabel}`;
+              badge.title = data.source || 'Genuine GoPro Physical IMU Telemetry';
             }
             // Ensure sequence accommodates any additional frames being processed
             const requiredCount = Math.max(typeof totalFrames === 'number' ? totalFrames : 0, currentFrame + 1, imuSequenceData.length);

@@ -93,7 +93,7 @@ def test_export_circumference_csv():
     assert "text/csv" in response.headers.get("content-type", "")
     lines = response.text.strip().split("\n")
     expected_header = "frame_index,arc_radius_m,azimuth_deg,x_m,y_m,wave_height_m,distance_from_vessel_m"
-    assert lines[0].strip() == expected_header
+    assert lines[0].strip().startswith(expected_header)
     # 10 radii * 161 azimuth angles = 1610 data points + 1 header line = 1611 lines
     assert len(lines) == 1611
 

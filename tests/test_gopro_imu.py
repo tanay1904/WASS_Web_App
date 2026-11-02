@@ -191,3 +191,19 @@ def test_export_annotated_xyz_with_imu(tmp_path):
     assert len(lines) == 2
     assert lines[0] == "x_camera_m,y_camera_m,z_camera_m,distance_from_observer_m,height_from_sea_level_m,gyro_x_dps,gyro_y_dps,gyro_z_dps,accel_x_g,accel_y_g,accel_z_g"
     assert "2.50,-1.20,0.30,0.040,-0.020,1.050" in lines[1]
+
+
+def test_pure_mp4_telemetry_source():
+    """Verify that the active sequence IMU telemetry reflects genuine GoPro HERO GPMF data."""
+    resp = client.get("/api/telemetry/imu")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "source" in data
+    assert "GoPro HERO GPMF" in data["source"]
+    assert len(data.get("frames", [])) >= 840
+    f0 = data["frames"][0]
+    assert "gyroscope" in f0
+    assert "accelerometer" in f0
+    assert "x_dps" in f0["gyroscope"]
+    assert "z_g" in f0["accelerometer"]
+

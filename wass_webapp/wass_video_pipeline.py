@@ -421,6 +421,13 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buff
     import json
     rendered_count = 0
 
+    seq_imu_payload = None
+    try:
+        from wass_webapp.gopro_imu import get_or_extract_sequence_imu
+        seq_imu_payload = get_or_extract_sequence_imu(seq_dir, total_frames=len(workspaces), fps=10.0)
+    except Exception:
+        pass
+
     for i, wd in enumerate(workspaces):
         # 1. Locate 3D points
         xyz_source = os.path.join(wd, "plane_refinement_inliers.xyz")
@@ -489,19 +496,23 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buff
             frame_imu = None
             try:
                 from wass_webapp.gopro_imu import export_frame_imu_csv
-                export_frame_imu_csv(seq_dir, i)
-                seq_imu_file = os.path.join(seq_dir, "gopro_imu_telemetry.json")
-                if os.path.exists(seq_imu_file):
-                    with open(seq_imu_file, "r") as sif:
-                        sdata = json.load(sif)
-                    frames = sdata.get("frames", [])
-                    if 0 <= i < len(frames):
-                        frame_imu = frames[i]
+                if seq_imu_payload and "frames" in seq_imu_payload and 0 <= i < len(seq_imu_payload["frames"]):
+                    frame_imu = seq_imu_payload["frames"][i]
+                    export_frame_imu_csv(seq_dir, i, imu_entry=frame_imu)
+                else:
+                    export_frame_imu_csv(seq_dir, i)
+                    seq_imu_file = os.path.join(seq_dir, "gopro_imu_telemetry.json")
+                    if os.path.exists(seq_imu_file):
+                        with open(seq_imu_file, "r") as sif:
+                            sdata = json.load(sif)
+                        frames = sdata.get("frames", [])
+                        if 0 <= i < len(frames):
+                            frame_imu = frames[i]
             except Exception:
                 pass
 
             export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"), imu_telemetry=frame_imu)
-            export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
+            export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i, imu_telemetry=frame_imu)
             rendered_count += 1
 
         # 2. Images & Disparity maps

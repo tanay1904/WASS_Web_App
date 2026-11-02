@@ -533,6 +533,14 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, recon
             target_frames = min(max_frames, total_vid_frames)
             log(f"[WASS Ingestion] Mode: FIXED SLICE ({target_frames} frames from offset {start_frame})")
 
+        # Pre-initialize GoPro physical IMU telemetry sequence so all streaming frames have IMU metadata
+        seq_imu_payload = None
+        try:
+            from wass_webapp.gopro_imu import get_or_extract_sequence_imu
+            seq_imu_payload = get_or_extract_sequence_imu(seq_dir, total_frames=target_frames, fps=10.0, video_path=custom_cam0 or None)
+        except Exception as e:
+            log(f"[GoPro IMU] Upfront telemetry load note: {e}")
+
         for i in range(target_frames):
             f0_s, f1_s = None, None
             if cap0 and cap1 and cap0.isOpened() and cap1.isOpened():
@@ -668,19 +676,23 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, recon
             frame_imu = None
             try:
                 from wass_webapp.gopro_imu import export_frame_imu_csv
-                export_frame_imu_csv(seq_dir, i)
-                seq_imu_file = os.path.join(seq_dir, "gopro_imu_telemetry.json")
-                if os.path.exists(seq_imu_file):
-                    with open(seq_imu_file, "r") as sif:
-                        sdata = json.load(sif)
-                    frames = sdata.get("frames", [])
-                    if 0 <= i < len(frames):
-                        frame_imu = frames[i]
+                if seq_imu_payload and "frames" in seq_imu_payload and 0 <= i < len(seq_imu_payload["frames"]):
+                    frame_imu = seq_imu_payload["frames"][i]
+                    export_frame_imu_csv(seq_dir, i, imu_entry=frame_imu)
+                else:
+                    export_frame_imu_csv(seq_dir, i)
+                    seq_imu_file = os.path.join(seq_dir, "gopro_imu_telemetry.json")
+                    if os.path.exists(seq_imu_file):
+                        with open(seq_imu_file, "r") as sif:
+                            sdata = json.load(sif)
+                        frames = sdata.get("frames", [])
+                        if 0 <= i < len(frames):
+                            frame_imu = frames[i]
             except Exception:
                 pass
 
             export_annotated_xyz(pts_arr, dist_obs, h_sea, os.path.join(seq_dir, f"annotated_points_{i:03d}.csv"), imu_telemetry=frame_imu)
-            export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i)
+            export_circular_arcs_circumference_csv(pts_arr, h_sea, os.path.join(seq_dir, f"circular_arcs_points_{i:03d}.csv"), frame_idx=i, imu_telemetry=frame_imu)
 
             rendered_count += 1
             prog = int(20 + (i + 1) / max(1, target_frames) * 75)
