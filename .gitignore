@@ -89,4 +89,7 @@ drive_imu_data/extracted_folder1/
 drive_imu_data/zip_test/
 drive_imu_data/folder1/
 drive_imu_data/folder2/
+drive_imu_data/gpmf_cache/
+drive_imu_data/gopro_imu_full_*.json
+
 
