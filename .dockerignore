@@ -1,0 +1,54 @@
+# Version Control
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Python Bytecode & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+venv/
+env/
+.venv/
+
+# Correlation & External Drive IMU Datasets (Excluded from Container Image)
+drive_imu_data/
+
+# Root diagnostic screenshots, videos, test outputs, and audit logs
+/*.png
+/*.jpg
+/*.jpeg
+/*.mp4
+/*.MP4
+/*.jsonl
+*_audit_results.json
+level3_audit_results.json
+*_results.json
+test_*.png
+verify_*.png
+screenshot_*.png
+audit_*.png
+cam*_streamed_frame0.png
+
+# Keep documentation images
+!docs/images/*
+
+# Intermediate C++ build cache, scratch, and cloned upstream wass
+wass_build_cache/
+wass/
+wass_dist/
+scratch/
+.Xil/
+
+# Dev environment configs
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
