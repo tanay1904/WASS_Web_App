@@ -82,3 +82,11 @@ wass_webapp/workspace/sequence/*.xyz
 # System / OS
 .DS_Store
 Thumbs.db
+
+# Drive raw telemetry downloads and bag extractions
+drive_imu_data/files.zip
+drive_imu_data/extracted_folder1/
+drive_imu_data/zip_test/
+drive_imu_data/folder1/
+drive_imu_data/folder2/
+
