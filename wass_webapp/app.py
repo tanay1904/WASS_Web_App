@@ -2047,14 +2047,14 @@ def get_frame_imu(frame_idx: int, audio_sync: bool = Query(True)):
         from wass_webapp.gopro_imu import get_or_extract_sequence_imu
         seq_dir = os.path.join(WORK_DIR, "sequence")
         meta_file = os.path.join(seq_dir, "sequence_meta.json")
-        fps = 30.0
+        fps = 10.0
         total_frames = max(150, frame_idx + 1)
         if os.path.exists(meta_file):
             try:
                 with open(meta_file, "r") as mf:
                     m = json.load(mf)
                     total_frames = max(int(m.get("total_frames", 150)), frame_idx + 1)
-                    fps = float(m.get("fps", 30.0))
+                    fps = float(m.get("fps", 10.0))
             except Exception:
                 pass
 

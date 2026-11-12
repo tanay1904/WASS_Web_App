@@ -420,7 +420,7 @@ def run_wass_pipeline(work_dir, binaries, num_frames):
     return True
 
 
-def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=False, fps=30.0):
+def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buffer=False, fps=10.0):
     """
     Translates raw native WASS C++ outputs (plane_refinement_inliers.xyz, plane.txt, disparity_final_scaled.png)
     into Web Studio sequence artifacts (points_XXX.json, points_XXX.xyz, wave_analysis_XXX.json, sequence_meta.json).
@@ -435,7 +435,7 @@ def format_wass_workspaces_to_sequence(workspaces, seq_dir, enable_circular_buff
     import json
     rendered_count = 0
 
-    effective_fps = float(fps) if fps and fps > 0 else 30.0
+    effective_fps = float(fps) if fps and fps > 0 else 10.0
     seq_imu_payload = None
     try:
         from wass_webapp.gopro_imu import get_or_extract_sequence_imu

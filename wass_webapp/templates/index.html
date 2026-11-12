@@ -560,10 +560,10 @@
                     <span class="small text-muted" style="font-size: 0.72rem;">Rate:</span>
                     <select class="form-select form-select-sm w-auto py-0 px-2" style="font-size: 0.72rem;" id="fpsSelect" onchange="changeSpeed()">
                       <option value="5">5 FPS</option>
-                      <option value="10">10 FPS</option>
+                      <option value="10" selected>10 FPS (1x Real-Time)</option>
                       <option value="15">15 FPS</option>
                       <option value="24">24 FPS</option>
-                      <option value="30" selected>30 FPS</option>
+                      <option value="30">30 FPS</option>
                       <option value="60">60 FPS (Native)</option>
                     </select>
                   </div>
@@ -3783,6 +3783,13 @@
             if (opt) opt.innerText = `Continuous Playback Stream (${totalFrames} Synchronized Frames)`;
             const activeBadge = document.getElementById('framesActiveBadge');
             if (activeBadge) activeBadge.innerHTML = `<i class="fa-solid fa-bolt me-1"></i> ${totalFrames} Frames Active`;
+            if (meta.fps) {
+              const fpsSel = document.getElementById('fpsSelect');
+              if (fpsSel) {
+                fpsSel.value = String(Math.round(meta.fps));
+                changeSpeed();
+              }
+            }
             const frameBadge = document.getElementById('frameCounterBadge');
             if (frameBadge && mode === 'sequence') {
               const maxDisplay = Math.max(0, totalFrames - 1);
