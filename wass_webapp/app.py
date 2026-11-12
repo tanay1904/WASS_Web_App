@@ -546,6 +546,12 @@ def run_stereo_stream_worker(pair_name="pair1", max_frames=100000, step=1, recon
             detected = int(cap0.get(cv2.CAP_PROP_FRAME_COUNT))
             if detected > 0:
                 total_vid_frames = max(1, detected - start_frame)
+        else:
+            cached_files = glob.glob(os.path.join(seq_dir, "video_frame_left_*.jpg"))
+            if cached_files:
+                total_vid_frames = min(max_frames, len(cached_files))
+            else:
+                total_vid_frames = min(max_frames, 50)
 
         if entire_video:
             target_frames = total_vid_frames

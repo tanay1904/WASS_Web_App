@@ -4,12 +4,7 @@ Correlate GoPro In-Camera IMU Telemetry with Drive Ground-Truth Motion Records
 =============================================================================
 Matches GoPro ICM-20689 IMU data (from Pair 1 & Pair 2) with high-rate Drive IMU
 and motion state CSVs from Google Drive (`csv_file_26-06-26_ina` run `hms_20260626_065941`).
-
-Validation Proof:
-- Pair 1 Cam 0 aligns at t = 1579.8s
-- Pair 1 Cam 1 aligns at t = 1556.2s
-- Difference: exactly 23.60s (matching the hydroacoustic audio sync lag!)
-- Pair 2 Cam 0 aligns at t = 2892.1s with Cam 1 leading by 10.90s.
+Streamlined Schema: Pruned repetitive unit conversions, static metadata, and duplicate metrics.
 """
 
 import os
@@ -48,7 +43,7 @@ def load_drive_data(run_dir):
 
 def generate_correlated_csv(pair_id, cam0_feed, cam1_feed, offset_sec, start_sample_idx,
                             rows_imu, rows_mot, mot_t, out_csv_path):
-    print(f"\n=== Generating Correlated CSV for {pair_id} ===")
+    print(f"\n=== Generating Streamlined Correlated CSV for {pair_id} ===")
     p0_path = os.path.join(SEQ_DIR, f'gopro_imu_telemetry_{cam0_feed}.json')
     p1_path = os.path.join(SEQ_DIR, f'gopro_imu_telemetry_{cam1_feed}.json')
 
@@ -60,37 +55,35 @@ def generate_correlated_csv(pair_id, cam0_feed, cam1_feed, offset_sec, start_sam
     print(f"Camera frames to correlate: {n_frames} ({n_frames * 0.1:.1f}s)")
 
     headers = [
-        'frame_index', 'timestamp_sec', 'pair_id',
-        'drive_timestamp_iso', 'drive_timestamp_ns', 'drive_t_sec',
-        # Cam 0 (Left)
-        'cam0_feed', 'cam0_gyro_x_dps', 'cam0_gyro_y_dps', 'cam0_gyro_z_dps', 'cam0_gyro_mag_dps',
+        # 1. Timing & Indexing
+        'frame_index', 'timestamp_sec', 'drive_timestamp_iso',
+        # 2. Cam 0 (Left GoPro)
+        'cam0_gyro_x_dps', 'cam0_gyro_y_dps', 'cam0_gyro_z_dps', 'cam0_gyro_mag_dps',
         'cam0_accel_x_g', 'cam0_accel_y_g', 'cam0_accel_z_g', 'cam0_accel_mag_g',
         'cam0_pitch_deg', 'cam0_roll_deg',
-        # Cam 1 (Right)
-        'cam1_feed', 'cam1_shutter_offset_sec',
+        # 3. Cam 1 (Right GoPro, time-aligned with audio sync lag applied)
         'cam1_gyro_x_dps', 'cam1_gyro_y_dps', 'cam1_gyro_z_dps', 'cam1_gyro_mag_dps',
         'cam1_accel_x_g', 'cam1_accel_y_g', 'cam1_accel_z_g', 'cam1_accel_mag_g',
         'cam1_pitch_deg', 'cam1_roll_deg',
-        # Drive IMU
+        # 4. Drive IMU (Vessel Reference, identical engineering units: dps & g)
         'drive_quat_w', 'drive_quat_x', 'drive_quat_y', 'drive_quat_z',
-        'drive_gyro_x_rad_s', 'drive_gyro_y_rad_s', 'drive_gyro_z_rad_s',
         'drive_gyro_x_dps', 'drive_gyro_y_dps', 'drive_gyro_z_dps', 'drive_gyro_mag_dps',
-        'drive_accel_x_m_s2', 'drive_accel_y_m_s2', 'drive_accel_z_m_s2',
         'drive_accel_x_g', 'drive_accel_y_g', 'drive_accel_z_g', 'drive_accel_mag_g',
-        # Drive Motion / Vessel State
+        # 5. Vessel Hydrodynamic Motion & Safety State
         'drive_roll_phi_deg', 'drive_pitch_theta_deg',
-        'drive_roll_rate_phd_rad_s', 'drive_pitch_rate_thd_rad_s',
         'drive_heave_z_m', 'drive_heave_velocity_zd_m_s', 'drive_heave_accel_az_hp_m_s2',
         'drive_severity_S', 'drive_severity_S_bar', 'drive_light_name',
-        # Cross-Correlation Invariants
+        # 6. Cross-Validation Residuals
         'delta_gyro_mag_dps', 'delta_accel_mag_g'
     ]
 
+    offset_samples = int(round(offset_sec * 10.0))
     rows_out = []
 
     for idx in range(n_frames):
         c0 = d0[idx]
-        c1 = d1[idx]
+        c1_idx = min(idx + offset_samples, len(d1) - 1)
+        c1 = d1[c1_idx]
 
         d_idx = min(start_sample_idx + idx, len(rows_imu) - 1)
         r_imu = rows_imu[d_idx]
@@ -115,7 +108,6 @@ def generate_correlated_csv(pair_id, cam0_feed, cam1_feed, offset_sec, start_sam
 
         # Drive IMU
         d_iso = r_imu[1]
-        d_ns = r_imu[2]
         qx, qy, qz, qw = float(r_imu[4]), float(r_imu[5]), float(r_imu[6]), float(r_imu[7])
         dg_x, dg_y, dg_z = float(r_imu[8]), float(r_imu[9]), float(r_imu[10])
         dg_x_dps, dg_y_dps, dg_z_dps = dg_x * 57.2958, dg_y * 57.2958, dg_z * 57.2958
@@ -128,8 +120,6 @@ def generate_correlated_csv(pair_id, cam0_feed, cam1_feed, offset_sec, start_sam
         # Drive Motion
         m_phi = float(r_mot[28]) if len(r_mot) > 28 and r_mot[28] else 0.0
         m_theta = float(r_mot[29]) if len(r_mot) > 29 and r_mot[29] else 0.0
-        m_phd = float(r_mot[30]) if len(r_mot) > 30 and r_mot[30] else 0.0
-        m_thd = float(r_mot[31]) if len(r_mot) > 31 and r_mot[31] else 0.0
         m_z = float(r_mot[19]) if len(r_mot) > 19 and r_mot[19] else 0.0
         m_zd = float(r_mot[22]) if len(r_mot) > 22 and r_mot[22] else 0.0
         m_az_hp = float(r_mot[32]) if len(r_mot) > 32 and r_mot[32] else 0.0
@@ -141,24 +131,25 @@ def generate_correlated_csv(pair_id, cam0_feed, cam1_feed, offset_sec, start_sam
         d_a_diff = round(abs(c0_amag - da_mag), 3)
 
         row = [
-            idx, round(float(idx) * 0.1, 4), pair_id,
-            d_iso, d_ns, round(d_t, 4),
-            cam0_feed, round(c0_gx, 2), round(c0_gy, 2), round(c0_gz, 2), round(c0_gmag, 2),
+            # 1. Timing
+            idx, round(float(idx) * 0.1, 4), d_iso,
+            # 2. Cam 0
+            round(c0_gx, 2), round(c0_gy, 2), round(c0_gz, 2), round(c0_gmag, 2),
             round(c0_ax, 3), round(c0_ay, 3), round(c0_az, 3), round(c0_amag, 3),
             round(c0_p, 2), round(c0_r, 2),
-            cam1_feed, offset_sec,
+            # 3. Cam 1
             round(c1_gx, 2), round(c1_gy, 2), round(c1_gz, 2), round(c1_gmag, 2),
             round(c1_ax, 3), round(c1_ay, 3), round(c1_az, 3), round(c1_amag, 3),
             round(c1_p, 2), round(c1_r, 2),
+            # 4. Drive IMU
             round(qw, 4), round(qx, 4), round(qy, 4), round(qz, 4),
-            round(dg_x, 4), round(dg_y, 4), round(dg_z, 4),
             round(dg_x_dps, 2), round(dg_y_dps, 2), round(dg_z_dps, 2), round(dg_mag, 2),
-            round(da_x, 3), round(da_y, 3), round(da_z, 3),
             round(da_x_g, 3), round(da_y_g, 3), round(da_z_g, 3), round(da_mag, 3),
+            # 5. Vessel State
             round(m_phi, 2), round(m_theta, 2),
-            round(m_phd, 4), round(m_thd, 4),
             round(m_z, 3), round(m_zd, 3), round(m_az_hp, 3),
             round(m_S, 3), round(m_S_bar, 3), m_light,
+            # 6. Residuals
             d_g_diff, d_a_diff
         ]
         rows_out.append(row)
@@ -168,7 +159,7 @@ def generate_correlated_csv(pair_id, cam0_feed, cam1_feed, offset_sec, start_sam
         w.writerow(headers)
         w.writerows(rows_out)
 
-    print(f"Saved {len(rows_out)} correlated rows to: {out_csv_path}")
+    print(f"Saved {len(rows_out)} correlated rows ({len(headers)} columns) to: {out_csv_path}")
     return out_csv_path
 
 
